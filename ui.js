@@ -98,7 +98,7 @@
       const disabled=busy || isRunning() || !state.connected ? "disabled" : "";
       return `<section class="cf-attendance" aria-label="Attendance copying"><div class="cf-section-title"><h2>Attendance</h2>${copy ? `<button class="cf-text-button" data-action="clear-attendance" aria-label="Clear copied attendance" ${busy || isRunning() ? "disabled" : ""}>Clear</button>` : ''}</div>
         ${copy ? `<p class="cf-attendance-summary" title="${esc(copy.courseLabel)}">${esc(copy.sessionLabel)} &middot; ${copy.present} present &middot; ${copy.absent} absent<br><span>${esc(copy.date)}</span></p>` : ''}
-        <div class="cf-attendance-actions"><button class="cf-secondary" data-action="copy-attendance" ${disabled}>${copy ? "Copy again" : "Copy attendance"}</button>${copy ? `<button class="cf-primary" data-action="apply-attendance" ${disabled}>Apply to this session</button>` : ''}</div>
+        <div class="cf-attendance-actions"><button class="cf-primary" data-action="copy-attendance" ${disabled}>${copy ? "Copy again" : "Copy attendance"}</button>${copy ? `<button class="cf-primary" data-action="apply-attendance" ${disabled}>Apply to this session</button>` : ''}</div>
         <p class="cf-attendance-hint">${copy ? "Apply to another session, then review and Save on the website." : "Mark absentees on the website, then copy for the next session."}</p></section>`;
     }
     function fieldEditor(field) {

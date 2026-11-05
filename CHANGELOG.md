@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1 - 2026-11-05
+
+- Give Copy attendance / Copy again the raised blue button style so available actions look clearly clickable.
+
 ## 1.1.0 - 2026-11-05
 
 - Copy attendance from the loaded student list and apply it to another session of the same class/date.
