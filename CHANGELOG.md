@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.5 - 2026-11-05
+
+- Replace the attendance settings caption with a compact Open attendance shortcut to the Regular Class Attendance page.
+
 ## 1.1.4 - 2026-11-05
 
 - Rename the visible extension branding to Jain ERP Assist, with an independent-tool description.
