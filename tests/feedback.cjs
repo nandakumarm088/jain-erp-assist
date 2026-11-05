@@ -54,8 +54,27 @@ let context;
   await publish('filter','done','Filters applied.');
   await feedback('library').getByText('Filters applied',{exact:true}).waitFor();await below('library','.cf-library');
   await feedback('library').waitFor({state:'detached',timeout:3500});
+  // Force feedback below the fold, then verify new messages reveal themselves.
+  await panel.addStyleTag({content:'.cf-library { min-height: 950px; }'});
+  await panel.locator('.cf-body').evaluate(el=>el.scrollTop=0);
   await publish('filter','error','Filter test error');
   await feedback('library').getByText('Filter test error',{exact:true}).waitFor();await below('library','.cf-library');
+  const fullyVisible=async section=>feedback(section).evaluate(el=>{
+    const bounds=el.getBoundingClientRect(),viewport=el.closest('.cf-body').getBoundingClientRect();
+    return bounds.top>=viewport.top-1 && bounds.bottom<=viewport.bottom+1;
+  });
+  assert.equal(await fullyVisible('library'),true,'hidden error automatically scrolls into view');
+  await panel.locator('.cf-body').evaluate(el=>el.scrollTop=0);
+  await worker.evaluate(tabId=>chrome.runtime.sendMessage({type:'classflow:view-changed',tabId}),tabId);
+  await panel.waitForTimeout(250);
+  assert.equal(await panel.locator('.cf-body').evaluate(el=>el.scrollTop),0,'unchanged feedback respects manual scroll');
+  await publish('filter','error','A different filter error');
+  await feedback('library').getByText('A different filter error',{exact:true}).waitFor();
+  assert.equal(await fullyVisible('library'),true,'changed error is revealed too');
+  // Attendance feedback scrolls upward when the user is at the bottom.
+  await publish('attendance','error','New attendance error');
+  await feedback('attendance').getByText('New attendance error',{exact:true}).waitFor();
+  assert.equal(await fullyVisible('attendance'),true,'attendance error scrolls into view above');
   // Backup validation also stays below Saved classes, rather than the page header.
   const choose=panel.waitForEvent('filechooser');await panel.getByRole('button',{name:'Import presets',exact:true}).click();
   await (await choose).setFiles({name:'bad.json',mimeType:'application/json',buffer:Buffer.from('bad JSON')});

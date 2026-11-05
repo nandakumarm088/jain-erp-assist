@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1 - 2026-11-05
+
+- Scroll new or changed section messages into view when hidden, without stealing keyboard focus or repeatedly overriding manual scrolling.
+
 ## 1.5.0 - 2026-11-05
 
 - Add category rename and deletion; deleting a category moves its presets to Uncategorized.

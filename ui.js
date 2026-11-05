@@ -30,6 +30,7 @@
     let busy = false;
     let disconnected = false;
     let lastView = "";
+    let visibleFeedback = new Map();
     let dateEntry = null;
     let dateWrites = Promise.resolve();
     let draggedPreset = null;
@@ -174,6 +175,20 @@
         const element = container.querySelector(`#${CSS.escape(focusId)}`);
         if (element) { element.focus({ preventScroll: true }); if (typeof selection === "number" && element.type !== "date") { try { element.setSelectionRange(selection, selection); } catch {} } }
       }
+      // Reveal new/changed feedback once; later renders must respect manual scrolling.
+      const nextFeedback = new Map();
+      for (const message of container.querySelectorAll("[data-feedback-for]")) {
+        const section = message.dataset.feedbackFor;
+        const content = message.textContent;
+        nextFeedback.set(section, content);
+        if (visibleFeedback.get(section) === content) continue;
+        const bounds = message.getBoundingClientRect();
+        const viewport = body?.contains(message) ? body.getBoundingClientRect() : { top: 0, bottom: innerHeight };
+        if (bounds.top < viewport.top || bounds.bottom > viewport.bottom) {
+          message.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "instant" });
+        }
+      }
+      visibleFeedback = nextFeedback;
     }
     function signature() {
       // Polling must not keep replacing focused inputs or disturb an open editor.
