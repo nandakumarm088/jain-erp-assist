@@ -34,8 +34,9 @@ function serial(key, task) {
   return next.finally(() => { if (queues.get(key) === next) queues.delete(key); });
 }
 async function readLocal() {
-  const data = await chrome.storage.local.get(["classflow.presets", "classflow.cache", "classflow.context", "classflow.collapsedCategories"]);
-  return { collapsedCategories: (data["classflow.collapsedCategories"] || []).filter(key => typeof key === "string"), presets: (data["classflow.presets"] || []).map(Core.cleanPreset), cache: data["classflow.cache"] || {}, context: data["classflow.context"] || null };
+  const data = await chrome.storage.local.get(["classflow.presets", "classflow.cache", "classflow.context", "classflow.categories", "classflow.collapsedCategories"]);
+  const presets = (data["classflow.presets"] || []).map(Core.cleanPreset);
+  return { categories: Core.categoryNames(presets, data["classflow.categories"] || []), collapsedCategories: (data["classflow.collapsedCategories"] || []).filter(key => typeof key === "string"), presets, cache: data["classflow.cache"] || {}, context: data["classflow.context"] || null };
 }
 async function pageCall(tabId, method, argument, active = false) {
   const execute = () => chrome.scripting.executeScript({ target: { tabId }, world: "MAIN",
@@ -246,14 +247,14 @@ async function dispatch(message, sender) {
     return { ok: true };
   }
   if (message.type === "EXPORT_PRESETS") {
-    const { presets } = await readLocal();
-    return { backup: Core.createPresetBackup(presets) };
+    const { presets, categories } = await readLocal();
+    return { backup: Core.createPresetBackup(presets, categories) };
   }
   if (message.type === "IMPORT_PRESETS") {
     return serial("presets", async () => {
       // Validate every entry before writing anything; existing presets are never replaced.
       const imported = Core.parsePresetBackup(message.text);
-      const { presets } = await readLocal();
+      const { presets, categories } = await readLocal();
       const seen = new Set(presets.map(Core.presetFingerprint));
       let added = 0, skipped = 0;
       for (const preset of imported) {
@@ -263,7 +264,8 @@ async function dispatch(message, sender) {
         presets.push(Core.cleanPreset({ ...preset, id: crypto.randomUUID(), updatedAt: Date.now() }));
         added++;
       }
-      if (added) await chrome.storage.local.set({ "classflow.presets": presets });
+      const allCategories = Core.categoryNames(presets, [...categories, ...(JSON.parse(message.text).categories || [])]);
+      await chrome.storage.local.set({ "classflow.presets": presets, "classflow.categories": allCategories });
       return { added, skipped };
     });
   }
@@ -271,12 +273,22 @@ async function dispatch(message, sender) {
     return serial("presets", async () => {
       const error = Core.validatePreset(message.preset);
       if (error) throw new Error(error);
-      const { presets } = await readLocal();
+      const { presets, categories } = await readLocal();
       const preset = Core.cleanPreset({ ...message.preset, name: message.preset.name.trim(), id: message.preset.id || crypto.randomUUID(), updatedAt: Date.now() });
       const existing = presets.findIndex(item => item.id === preset.id);
       if (existing < 0) presets.push(preset); else presets[existing] = preset;
-      await chrome.storage.local.set({ "classflow.presets": presets });
+      await chrome.storage.local.set({ "classflow.presets": presets, "classflow.categories": Core.categoryNames(presets, categories) });
       return { ok: true, preset };
+    });
+  }
+  if (message.type === "CREATE_CATEGORY") {
+    return serial("presets", async () => {
+      if (typeof message.name !== "string" || !message.name.trim() || message.name.trim().replace(/\s+/g, " ").length > 50) throw new Error("Enter a category name of 1 to 50 characters.");
+      const name = message.name.trim().replace(/\s+/g, " ");
+      const { categories } = await readLocal();
+      const existing = categories.find(category => Core.normalize(category) === Core.normalize(name));
+      if (!existing) { categories.push(name); await chrome.storage.local.set({ "classflow.categories": categories }); }
+      return { category: existing || name };
     });
   }
   if (message.type === "SET_CATEGORY_COLLAPSED") {
@@ -301,8 +313,8 @@ async function dispatch(message, sender) {
   }
   if (message.type === "DELETE_PRESET") {
     return serial("presets", async () => {
-      const { presets } = await readLocal();
-      await chrome.storage.local.set({ "classflow.presets": presets.filter(preset => preset.id !== message.id) });
+      const { presets, categories } = await readLocal();
+      await chrome.storage.local.set({ "classflow.presets": presets.filter(preset => preset.id !== message.id), "classflow.categories": categories });
       return { ok: true };
     });
   }

@@ -111,8 +111,17 @@
     return JSON.stringify([snapshot.origin, snapshot.account, settings.dateMode,
       settings.classType, settings.dateMode === "previous" ? toSiteDate(settings.previousDate) : "current", fieldKey, context]);
   }
-  function createPresetBackup(presets) {
-    return { format: "jain-erp-assist-presets", version: 1, presets: presets.map(preset => {
+  function categoryNames(presets, saved = []) {
+    const names = new Map();
+    for (const value of [...saved, ...presets.map(preset => preset.category)]) {
+      if (typeof value !== "string") continue;
+      const name = value.trim().replace(/\s+/g, " ");
+      if (name && !names.has(normalize(name))) names.set(normalize(name), name);
+    }
+    return [...names.values()];
+  }
+  function createPresetBackup(presets, categories = []) {
+    return { format: "jain-erp-assist-presets", version: 1, categories: categoryNames(presets, categories), presets: presets.map(preset => {
       const clean = cleanPreset(preset);
       return { name: clean.name, category: clean.category, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
     }) };
@@ -122,6 +131,7 @@
     let backup;
     try { backup = JSON.parse(text); } catch { throw new Error("This file is not valid JSON. Choose a preset backup exported by Jain ERP Assist."); }
     if (backup?.format !== "jain-erp-assist-presets" || backup.version !== 1 || !Array.isArray(backup.presets)) throw new Error("This is not a supported Jain ERP Assist preset backup.");
+    if (backup.categories != null && (!Array.isArray(backup.categories) || backup.categories.length > 200 || backup.categories.some(name => typeof name !== "string" || !name.trim() || name.trim().replace(/\s+/g, " ").length > 50))) throw new Error("This backup has invalid category names.");
     if (backup.presets.length > 200) throw new Error("Import at most 200 presets in one backup.");
     return backup.presets.map((preset, index) => {
       if (!preset || typeof preset.name !== "string") throw new Error(`Preset ${index + 1} has no valid name.`);
@@ -136,7 +146,7 @@
     return JSON.stringify([normalize(preset.name), normalize(preset.category), preset.classTypeOverride || null,
       FIELDS.map(field => (preset.fields[field.key] || []).map(choice => [choice.value, normalize(choice.label)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))]);
   }
-  const api = { createPresetBackup, parsePresetBackup, presetFingerprint, FIELDS, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };
+  const api = { categoryNames, createPresetBackup, parsePresetBackup, presetFingerprint, FIELDS, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };
   root.ClassFlowCore = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

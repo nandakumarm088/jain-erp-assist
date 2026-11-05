@@ -34,6 +34,9 @@
     let dateWrites = Promise.resolve();
     let draggedPreset = null;
     let successTimer = null;
+    let removalTimer = null;
+    let categoryFormOpen = false;
+    let categoryName = "";
     container.className = "cf-app";
     const isRunning = () => state.job?.status === "running";
     const context = () => state.snapshot || { ...(state.context || { origin: "https://jained.jgianveshana.com", account: "current-lecturer" }), ...draft?.scope };
@@ -93,8 +96,11 @@
     }
     const categoryKey = preset => preset?.category ? `category:${Core.normalize(preset.category)}` : "uncategorized";
     function classGroups(presets) {
-      if (!state.presets.some(preset => preset.category)) return presets.map(card).join("");
+      if (!(state.categories || []).length && !state.presets.some(preset => preset.category)) return presets.map(card).join("");
       const groups = new Map();
+      for (const name of state.categories || []) {
+        if (!filter.trim() || Core.normalize(name).includes(Core.normalize(filter))) groups.set(`category:${Core.normalize(name)}`, { key: `category:${Core.normalize(name)}`, name, presets: [] });
+      }
       for (const preset of presets) {
         const key = categoryKey(preset);
         if (!groups.has(key)) groups.set(key, { key, name: preset.category || "Uncategorized", presets: [] });
@@ -104,16 +110,17 @@
       if (groups.has("uncategorized")) ordered.push(groups.get("uncategorized"));
       return ordered.map((group, index) => {
         const collapsed = !filter.trim() && (state.collapsedCategories || []).includes(group.key);
-        return `<section class="cf-category" data-category-key="${esc(group.key)}"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3><div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.map(card).join("")}</div></section>`;
-      }).join("");
+        return `<section class="cf-category" data-category-key="${esc(group.key)}"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3><div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.length ? group.presets.map(card).join("") : '<p class="cf-category-empty">No classes yet.</p>'}</div></section>`;
+      }).join("") || '<div class="cf-no-results">No classes match your search.</div>';
     }
     function library() {
       const presets = state.presets.filter(preset => Core.normalize(`${preset.name} ${preset.category || ""} ${labelOf(preset, "course")} ${labelOf(preset, "section")}`).includes(Core.normalize(filter)));
       return `<div class="cf-library">
         <div class="cf-section-title"><h2>Saved classes <span>${state.presets.length.toString().padStart(2, "0")}</span></h2><button class="cf-text-button" data-action="new" ${isRunning() ? "disabled" : ""}>${icon("plus")} New preset</button></div>
-        ${state.presets.length > 6 ? `<label class="cf-search">${icon("search")}<input id="cf-search" placeholder="Find a class…" value="${esc(filter)}" aria-label="Find a saved class"></label>` : ''}
-        <div class="cf-card-list">${presets.length ? classGroups(presets) : state.presets.length ? '<div class="cf-no-results">No classes match your search.</div>' : `<div class="cf-empty"><h3>No saved classes</h3><p>Select your class on the website, then use Save this class.</p></div>`}</div>
-        <div class="cf-preset-tools" aria-label="Preset backups"><button type="button" class="cf-text-button" data-action="export-presets" aria-label="Export presets" title="Download a preset backup" ${busy || isRunning() || !state.presets.length ? "disabled" : ""}>Export</button><span aria-hidden="true">&middot;</span><button type="button" class="cf-text-button" data-action="import-presets" aria-label="Import presets" title="Import presets without replacing existing classes" ${busy || isRunning() ? "disabled" : ""}>Import</button><input type="file" id="cf-import-file" accept=".json,application/json" hidden></div>
+        ${!draft ? categoryCreator() : ''}
+        ${state.presets.length > 6 ?  `<label class="cf-search">${icon("search")}<input id="cf-search" placeholder="Find a class…" value="${esc(filter)}" aria-label="Find a saved class"></label>` : ''}
+        <div class="cf-card-list">${(presets.length || (state.categories || []).length) ? classGroups(presets) : state.presets.length ? '<div class="cf-no-results">No classes match your search.</div>' : `<div class="cf-empty"><h3>No saved classes</h3><p>Select your class on the website, then use Save this class.</p></div>`}</div>
+        <div class="cf-preset-tools" aria-label="Preset backups"><button type="button" class="cf-text-button cf-new-category" data-action="new-category" aria-label="New category" ${busy || isRunning() ? "disabled" : ""}>+ Category</button><button type="button" class="cf-text-button" data-action="export-presets" aria-label="Export presets" title="Download a preset backup" ${busy || isRunning() || (!state.presets.length && !(state.categories || []).length) ? "disabled" : ""}>Export</button><span aria-hidden="true">&middot;</span><button type="button" class="cf-text-button" data-action="import-presets" aria-label="Import presets" title="Import presets without replacing existing classes" ${busy || isRunning() ? "disabled" : ""}>Import</button><input type="file" id="cf-import-file" accept=".json,application/json" hidden></div>
       </div>`;
     }
     function attendanceControls() {
@@ -135,13 +142,16 @@
           : `<select id="cf-${field.key}" data-field="${field.key}"><option value="">${field.optional ? "Choose on website (not saved)" : `Choose ${esc(field.label.toLowerCase())}…`}</option>${available.map(option => `<option value="${esc(option.value)}" ${selected.some(choice => choice.value === option.value) ? "selected" : ""} ${option.disabled && !selected.some(choice => choice.value === option.value) ? "disabled" : ""}>${esc(option.label)}${option.unavailable ? " · saved selection" : ""}</option>`).join("")}</select>`}
         ${!available.length && !field.multiple ? '<small class="cf-field-hint">Options are remembered as you select them on the website.</small>' : ''}</div>`;
     }
+    function categoryCreator() {
+      return categoryFormOpen ? `<div class="cf-category-create" role="group" aria-label="Create category"><label for="cf-new-category">New category</label><div><input id="cf-new-category" maxlength="50" placeholder="e.g. Semester 5" value="${esc(categoryName)}" autocomplete="off"><button type="button" class="cf-primary" data-action="create-category" ${busy ? "disabled" : ""}>Create</button><button type="button" class="cf-icon-button" data-action="cancel-category" aria-label="Cancel new category">${icon("close")}</button></div></div>` : "";
+    }
     function editor() {
-      const categories = [...new Map(state.presets.filter(preset => preset.category).map(preset => [Core.normalize(preset.category), preset.category])).values()];
+      const categories = state.categories || [];
       return `<div class="cf-editor"><button class="cf-back" data-action="back">${icon("back")} Saved classes</button>
         <h1>${draft.id ? "Edit class" : "Save class"}</h1><p class="cf-editor-intro">Save your class filters. Session No and a fixed class type are optional.</p>
         <form id="cf-form"><div class="cf-form-field"><label for="cf-name">Class name</label><input id="cf-name" placeholder="e.g. Cyber Security · Lab 1" maxlength="80" value="${esc(draft.name)}" required autocomplete="off"></div>
-        <div class="cf-form-field"><label for="cf-category">Category <small class="cf-optional">Optional</small></label><input id="cf-category" list="cf-categories" placeholder="e.g. Semester 5" maxlength="50" value="${esc(draft.category || '')}" autocomplete="off"><datalist id="cf-categories">${categories.map(name => `<option value="${esc(name)}"></option>`).join("")}</datalist></div>
         ${Core.FIELDS.map(fieldEditor).join("")}
+        <div class="cf-form-field"><label for="cf-category">Category <small class="cf-optional">Optional</small></label><div class="cf-category-picker"><select id="cf-category"><option value="">No category</option>${categories.map(name => `<option value="${esc(name)}" ${Core.normalize(draft.category) === Core.normalize(name) ? "selected" : ""}>${esc(name)}</option>`).join("")}</select><button type="button" class="cf-category-new" data-action="new-category" aria-label="New category">${icon("plus")}</button></div>${categoryCreator()}</div>
         <fieldset class="cf-save-mode"><legend>Class type <span class="cf-optional">Optional</span></legend><div class="cf-segment" role="group" aria-label="Preset class type">${[["", "Filters only"], ["theory", "Theory"], ["lab", "Lab"]].map(([value,label]) => `<button type="button" data-action="preset-type" data-value="${value}" aria-pressed="${(draft.classTypeOverride || "") === value}" class="${(draft.classTypeOverride || "") === value ? "is-selected" : ""}">${label}</button>`).join("")}</div><p id="cf-save-summary" role="status">${draft.classTypeOverride ? `Saving as <strong>${draft.classTypeOverride === "lab" ? "Lab" : "Theory"}</strong>. This overrides the class type in Attendance settings.` : 'Saving <strong>filters only</strong>. Theory/Lab will use Attendance settings.'}</p></fieldset>
         <div class="cf-editor-actions">${draft.id ? `<button type="button" class="cf-icon-button cf-delete" data-action="delete" data-id="${esc(draft.id)}" aria-label="Delete this preset">${icon("trash")}</button>` : ''}<button type="button" class="cf-secondary" data-action="back">Cancel</button><button type="submit" class="cf-primary" ${busy ? "disabled" : ""}>${busy ? "Saving…" : "Save preset"}${icon("check")}</button></div></form></div>`;
     }
@@ -165,9 +175,9 @@
     }
     function signature() {
       // Polling must not keep replacing focused inputs or disturb an open editor.
-      return JSON.stringify([state.tabId, state.settings, state.collapsedCategories, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
+      return JSON.stringify([state.tabId, state.settings, state.collapsedCategories, state.categories, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
         state.job && [state.job.id, state.job.status, state.job.message, state.job.progress], draft ? state.cache : null,
-        draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice, errorSection, noticeSection]);
+        draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice, errorSection, noticeSection, categoryFormOpen]);
     }
     function update(next) {
       if (!next) return;
@@ -196,6 +206,7 @@
       finally { busy = false; render(); }
     }
     function startDraft(preset = null, capture = false) {
+      categoryFormOpen = false; categoryName = "";
       const live = state.snapshot;
       draft = preset ? structuredClone(preset) : { name: "", category: "", classTypeOverride: null, fields: Object.fromEntries(Core.FIELDS.map(field => [field.key, capture ? structuredClone(live?.fields[field.key].selected || []) : []])),
         scope: { origin: context().origin, account: context().account } };
@@ -246,10 +257,11 @@
       }
 
       if (event.target.id === "cf-name") draft.name = event.target.value;
-      if (event.target.id === "cf-category") draft.category = event.target.value;
+      if (event.target.id === "cf-new-category") categoryName = event.target.value;
       if (event.target.id === "cf-search") { filter = event.target.value; render(); }
     });
     container.addEventListener("change", async event => {
+      if (event.target.id === "cf-category") { draft.category = event.target.value; return; }
       if (event.target.id === "cf-import-file") {
         const file = event.target.files?.[0];
         event.target.value = "";
@@ -336,6 +348,7 @@
     });
     container.addEventListener("dragend", () => { draggedPreset = null; clearDrag(); });
     container.addEventListener("keydown", async event => {
+      if (event.target.id === "cf-new-category" && event.key === "Enter") { event.preventDefault(); container.querySelector('[data-action="create-category"]')?.click(); return; }
       const button = event.target.closest('[data-action="apply"]');
       if (!button || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key) || busy || isRunning()) return;
       event.preventDefault();
@@ -357,6 +370,7 @@
       const actionSection = ["copy-attendance", "apply-attendance", "clear-attendance"].includes(action) ? "attendance"
         : action === "stop" ? (state.job?.kind === "attendance" ? "attendance" : "library")
         : ["reset-date", "date-mode", "class-type", "open-page", "review-settings"].includes(action) ? "runtime"
+         : ["new-category", "create-category", "cancel-category"].includes(action) ? (draft ? "editor" : "library")
         : action === "capture" ? "capture" : ["new", "edit", "preset-type"].includes(action) ? "editor" : "library";
       try {
         await dateWrites;
@@ -368,6 +382,17 @@
         else if (["copy-attendance","apply-attendance","clear-attendance"].includes(action)) {
           error=""; notice=""; busy=true; render();
           update(await request({type:{"copy-attendance":"COPY_ATTENDANCE","apply-attendance":"APPLY_ATTENDANCE","clear-attendance":"CLEAR_ATTENDANCE"}[action]}));
+        }
+        else if (action === "new-category") {
+          categoryFormOpen = true; categoryName = ""; error = "";
+          render(); container.querySelector("#cf-new-category")?.focus();
+        }
+        else if (action === "cancel-category") { categoryFormOpen = false; categoryName = ""; }
+        else if (action === "create-category") {
+          busy = true; error = "";
+          const result = await request({ type: "CREATE_CATEGORY", name: categoryName });
+          if (draft) draft.category = result.category;
+          categoryFormOpen = false; categoryName = ""; filter = ""; await refresh();
         }
         else if (action === "toggle-category") {
           const key = target.dataset.category;
@@ -391,7 +416,7 @@
           update(await request({ type: "CAPTURE" }));
           startDraft(null, true);
         }
-        else if (action === "back") { draft = null; error = ""; notice = ""; render(); }
+        else if (action === "back") { categoryFormOpen = false; categoryName = ""; draft = null; error = ""; notice = ""; render(); }
         else if (action === "edit") { const preset = state.presets.find(item => item.id === target.dataset.id); if (preset) startDraft(preset); }
         else if (action === "preset-type") { draft.classTypeOverride = target.dataset.value || null; render(); }
         else if (action === "class-type" || action === "date-mode") {
@@ -411,8 +436,15 @@
         else if (action === "delete") {
           removed = state.presets.find(item => item.id === target.dataset.id);
           await request({ type: "DELETE_PRESET", id: target.dataset.id });
-          draft = null; notice = "Preset removed."; noticeSection = "library"; error = ""; await refresh();
+          draft = null; notice = "Preset removed."; noticeSection = "library"; error = "";
+          clearTimeout(removalTimer);
+          const removedId = removed.id;
+          removalTimer = setTimeout(() => {
+            if (notice === "Preset removed." && removed?.id === removedId) { notice = ""; removed = null; render(); }
+          }, 5000);
+          await refresh();
         } else if (action === "undo" && removed) {
+          clearTimeout(removalTimer);
           await request({ type: "SAVE_PRESET", preset: removed });
           removed = null; notice = "Preset restored."; noticeSection = "library"; await refresh();
         }

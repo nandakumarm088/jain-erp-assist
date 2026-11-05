@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.4.0 - 2026-11-05
+
+- Create and save categories independently of presets, including empty groups.
+- Select categories from a dropdown directly above the optional Class type section; create new ones inline if needed.
+- Preserve empty categories in backups and after deleting the last class.
+- Dismiss Preset removed and its Undo action after five seconds.
+
 ## 1.3.0 - 2026-11-05
 
 - Add optional user-defined preset categories with collapsible groups and remembered expansion state.

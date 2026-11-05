@@ -197,3 +197,10 @@ test('optional categories migrate, validate, and round-trip through backups',()=
  preset.category='x'.repeat(51);assert.match(Core.validatePreset(preset),/category name/);
  preset.category={};assert.match(Core.validatePreset(preset),/category name/);
 });
+
+test('independently saved and empty categories are exported and validated',()=>{
+ assert.deepEqual(Core.categoryNames([{category:'Semester 5'}],[' Semester 3 ','semester 3']),['Semester 3','Semester 5']);
+ const backup=Core.createPresetBackup([],['Semester 4']);assert.deepEqual(backup.categories,['Semester 4']);
+ assert.deepEqual(Core.parsePresetBackup(JSON.stringify(backup)),[]);
+ backup.categories=[{}];assert.throws(()=>Core.parsePresetBackup(JSON.stringify(backup)),/category names/);
+});
