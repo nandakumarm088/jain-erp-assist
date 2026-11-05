@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.3 - 2026-11-05
+
+- Place attendance status and errors directly below the Attendance card.
+- Keep filter, date/settings, preset backup/editor, and capture feedback beneath their originating sections.
+- Retain the two-second success timeout.
+
 ## 1.2.2 - 2026-11-05
 
 - Replace white active selections with filled indigo Date, blue Theory, and violet Lab controls.

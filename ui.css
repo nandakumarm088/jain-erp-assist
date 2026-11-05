@@ -391,3 +391,6 @@ html,body,#app { margin:0; width:100%; min-width:0; max-width:100%; height:100%;
 .cf-preset-edit:hover { background:#cdddf5; }
 .cf-preset[data-class-type="lab"] .cf-preset-edit { background:#e9defb; color:#61388f; border-color:#c8b4e5; }
 .cf-preset[data-class-type="lab"] .cf-preset-edit:hover { background:#ddcdf5; }
+
+.cf-section-feedback > .cf-banner,.cf-section-feedback > .cf-progress { margin:6px 8px 0; }
+.cf-capture-zone .cf-section-feedback > .cf-banner { margin:8px 0 0; }

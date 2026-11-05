@@ -23,6 +23,8 @@
     let lastSignature = "";
     let error = "";
     let notice = "";
+    let errorSection = "header";
+    let noticeSection = "library";
     let removed = null;
     let filter = "";
     let busy = false;
@@ -67,9 +69,9 @@
         <div class="cf-form-field"><label>Class type</label><div class="cf-segment" role="group" aria-label="Class type">${["theory", "lab"].map(type => `<button type="button" data-action="class-type" data-value="${type}" aria-pressed="${settings.classType === type}" class="${settings.classType === type ? "is-selected" : ""}" ${disabled}>${type === "lab" ? "Lab" : "Theory"}</button>`).join("")}</div></div>
         </section>`;
     }
-    function progress() {
+    function progress(section) {
       const job = state.job;
-      if (!job || (job.status === "done" && Date.now() >= job.updatedAt + 2000)) return "";
+      if (!job || (job.kind === "attendance" ? "attendance" : "library") !== section || (error && errorSection === section) || (job.status === "done" && Date.now() >= job.updatedAt + 2000)) return "";
       const running = job.status === "running";
       return `<section class="cf-progress cf-progress-${esc(job.status)}" role="status" aria-live="polite">
         <div class="cf-progress-top"><strong>${running ? '<span class="cf-spinner"></span>' : icon(job.status === "done" ? "check" : "clock")}${esc(running ? job.preset.name : job.status === "done" ? (job.kind === "attendance" ? "Attendance applied" : "Filters applied") : job.status === "error" ? "Needs your attention" : "Run stopped")}</strong>
@@ -79,8 +81,12 @@
           ? `<button class="cf-text-button" data-action="review-settings">Review attendance settings ${icon("arrow")}</button>`
           : `<button class="cf-text-button" data-action="edit" data-id="${esc(job.preset.id)}">Review this preset ${icon("arrow")}</button>` : ''}</section>`;
     }
-    function banners() {
-      return `${error ? `<div class="cf-banner cf-error" role="alert">${esc(error)}</div>` : ''}${notice ? `<div class="cf-banner cf-notice" role="status">${esc(notice)} ${removed ? '<button class="cf-text-button" data-action="undo">Undo</button>' : ''}</div>` : ''}`;
+    function banners(section) {
+      return `${error && errorSection === section ? `<div class="cf-banner cf-error" role="alert">${esc(error)}</div>` : ''}${notice && noticeSection === section ? `<div class="cf-banner cf-notice" role="status">${esc(notice)} ${removed ? '<button class="cf-text-button" data-action="undo">Undo</button>' : ''}</div>` : ''}`;
+    }
+    function feedback(section) {
+      const content = banners(section) + progress(section);
+      return content ? `<div class="cf-section-feedback" data-feedback-for="${section}">${content}</div>` : "";
     }
     function card(preset) {
       return `<div class="cf-preset" data-class-type="${esc(preset.classTypeOverride || 'dynamic')}" data-preset-id="${esc(preset.id)}" draggable="${!busy && !isRunning()}"><button class="cf-preset-apply" aria-label="${esc(preset.name)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-action="apply" data-id="${esc(preset.id)}" title="Drag to reorder; Alt+Up/Down to move. Apply ${esc(preset.name)}${preset.classTypeOverride ? ` · Always ${preset.classTypeOverride === "lab" ? "Lab" : "Theory"}` : ''}" ${!state.connected || busy || isRunning() ? "disabled" : ""}><span class="cf-preset-name">${esc(preset.name)}</span>${preset.classTypeOverride ? `<span class="cf-type-badge" aria-hidden="true">${preset.classTypeOverride === "lab" ? "Lab" : "Theory"}</span>` : ''}</button><button class="cf-icon-button cf-preset-edit" data-action="edit" data-id="${esc(preset.id)}" aria-label="Edit ${esc(preset.name)}" ${busy || isRunning() ? "disabled" : ""}>${icon("edit")}</button></div>`;
@@ -130,8 +136,8 @@
       const scroll = lastView === view ? container.querySelector(".cf-body")?.scrollTop || 0 : 0;
       lastView = view;
       container.innerHTML = `<section class="cf-shell" aria-label="Jain ERP Assist attendance filters and copying">
-        ${header()}<div class="cf-body">${banners()}${draft ? editor() : attendanceControls() + runtimeControls() + library() + progress()}</div>
-        ${!draft ? `<div class="cf-capture-zone"><button class="cf-capture" data-action="capture" ${busy || !state.connected || isRunning() ? "disabled" : ""}>${icon("capture")} Save this class</button><p class="cf-credit">Made by NK Developers</p></div>` : ''}</section>`;
+        ${header()}<div class="cf-body">${feedback("header")}${draft ? editor() + feedback("editor") : attendanceControls() + feedback("attendance") + runtimeControls() + feedback("runtime") + library() + feedback("library")}</div>
+        ${!draft ? `<div class="cf-capture-zone"><button class="cf-capture" data-action="capture" ${busy || !state.connected || isRunning() ? "disabled" : ""}>${icon("capture")} Save this class</button>${feedback("capture")}<p class="cf-credit">Made by NK Developers</p></div>` : ''}</section>`;
       const body = container.querySelector(".cf-body");
       if (body) body.scrollTop = scroll;
       if (focusId) {
@@ -143,11 +149,11 @@
       // Polling must not keep replacing focused inputs or disturb an open editor.
       return JSON.stringify([state.tabId, state.settings, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
         state.job && [state.job.id, state.job.status, state.job.message, state.job.progress], draft ? state.cache : null,
-        draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice]);
+        draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice, errorSection, noticeSection]);
     }
     function update(next) {
       if (!next) return;
-      if (next.error) { error = next.error; render(); return; }
+      if (next.error) { error = next.error; errorSection = "header"; render(); return; }
       if (state.tabId !== next.tabId) dateEntry = null;
       state = next;
       clearTimeout(successTimer);
@@ -175,7 +181,7 @@
       const live = state.snapshot;
       draft = preset ? structuredClone(preset) : { name: "", classTypeOverride: null, fields: Object.fromEntries(Core.FIELDS.map(field => [field.key, capture ? structuredClone(live?.fields[field.key].selected || []) : []])),
         scope: { origin: context().origin, account: context().account } };
-      error = ""; notice = "";
+      error = ""; notice = ""; errorSection = noticeSection = "editor";
       if (capture) {
         const course = labelOf(draft, "course").split(":")[0];
         draft.name = course || "";
@@ -229,7 +235,7 @@
         const file = event.target.files?.[0];
         event.target.value = "";
         if (!file) return;
-        error = ""; notice = ""; removed = null;
+        error = ""; notice = ""; removed = null; errorSection = noticeSection = "library";
         try {
           if (file.size > 1024 * 1024) throw new Error("Choose a preset backup smaller than 1 MB.");
           busy = true; render();
@@ -249,7 +255,7 @@
           await request({ type: "SET_SETTINGS", settings, yearOverride });
           if (yearOverride) state.previousYear = Number(yearOverride);
         });
-        dateWrites.catch(failure => { error = failure.message; });
+        dateWrites.catch(failure => { error = failure.message; errorSection = "runtime"; render(); });
         return;
       }
       const field = Core.FIELDS.find(item => item.key === event.target.dataset.field);
@@ -265,6 +271,7 @@
     container.addEventListener("submit", async event => {
       if (event.target.id !== "cf-form") return;
       event.preventDefault();
+      errorSection = "editor";
       error = Core.validatePreset(draft);
       if (error) { render(); return; }
       busy = true; render();
@@ -305,7 +312,7 @@
       if (from === row.dataset.presetId) return;
       const ids = state.presets.map(preset => preset.id).filter(id => id !== from);
       ids.splice(ids.indexOf(row.dataset.presetId) + Number(after), 0, from);
-      try { await reorderPresets(ids); } catch (failure) { error = failure.message; render(); }
+      try { await reorderPresets(ids); } catch (failure) { error = failure.message; errorSection = "library"; render(); }
     });
     container.addEventListener("dragend", () => { draggedPreset = null; clearDrag(); });
     container.addEventListener("keydown", async event => {
@@ -317,13 +324,17 @@
       if (next < 0 || next >= ids.length) return;
       [ids[index], ids[next]] = [ids[next], ids[index]];
       try { await reorderPresets(ids); container.querySelector(`[data-action="apply"][data-id="${CSS.escape(button.dataset.id)}"]`)?.focus(); }
-      catch (failure) { error = failure.message; render(); }
+      catch (failure) { error = failure.message; errorSection = "library"; render(); }
     });
     container.addEventListener("click", async event => {
       const target = event.target.closest("[data-action]");
       if (!target || target.disabled) return;
       const action = target.dataset.action;
       if (action === "import-presets") { container.querySelector("#cf-import-file").click(); return; }
+      const actionSection = ["copy-attendance", "apply-attendance", "clear-attendance"].includes(action) ? "attendance"
+        : action === "stop" ? (state.job?.kind === "attendance" ? "attendance" : "library")
+        : ["reset-date", "date-mode", "class-type", "open-page", "review-settings"].includes(action) ? "runtime"
+        : action === "capture" ? "capture" : ["new", "edit", "preset-type"].includes(action) ? "editor" : "library";
       try {
         await dateWrites;
         if (action === "reset-date") {
@@ -342,7 +353,7 @@
           link.href = url; link.download = "jain-erp-assist-presets.json";
           container.appendChild(link); link.click(); link.remove();
           setTimeout(() => URL.revokeObjectURL(url), 1000);
-          removed = null; error = ""; notice = "Presets exported.";
+          removed = null; error = ""; notice = "Presets exported."; noticeSection = "library";
         }
         else if (action === "open-page") await request({ type: "OPEN_PAGE", newTab: event.ctrlKey });
         else if (action === "review-settings") { container.querySelector(".cf-body").scrollTop = 0; container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true }); }
@@ -372,12 +383,12 @@
         else if (action === "delete") {
           removed = state.presets.find(item => item.id === target.dataset.id);
           await request({ type: "DELETE_PRESET", id: target.dataset.id });
-          draft = null; notice = "Preset removed."; error = ""; await refresh();
+          draft = null; notice = "Preset removed."; noticeSection = "library"; error = ""; await refresh();
         } else if (action === "undo" && removed) {
           await request({ type: "SAVE_PRESET", preset: removed });
-          removed = null; notice = "Preset restored."; await refresh();
+          removed = null; notice = "Preset restored."; noticeSection = "library"; await refresh();
         }
-      } catch (failure) { error = failure.message; }
+      } catch (failure) { error = failure.message; errorSection = actionSection; }
       finally { busy = false; render(); }
     });
     render();
@@ -387,7 +398,7 @@
       const poll = async () => {
         if (refreshing || disconnected) return;
         refreshing = true;
-        try { await refresh(); } catch (failure) { error = failure.message; render(); }
+        try { await refresh(); } catch (failure) { error = failure.message; errorSection = "header"; render(); }
         finally {
           refreshing = false;
           clearTimeout(timer);
@@ -398,7 +409,7 @@
       chrome.storage.onChanged.addListener((_changes, area) => { if (area === "local") poll(); });
       poll();
     }
-    return { update, refresh: () => refresh().catch(failure => { error = failure.message; render(); }), disconnected(message) { disconnected = true; state.connected = false; state.connection = message; render(); } };
+    return { update, refresh: () => refresh().catch(failure => { error = failure.message; errorSection = "header"; render(); }), disconnected(message) { disconnected = true; state.connected = false; state.connection = message; render(); } };
   }
   root.ClassFlowUI = { mount };
 })(globalThis);

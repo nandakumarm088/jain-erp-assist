@@ -128,3 +128,5 @@ Use **Export** below Saved classes to download `jain-erp-assist-presets.json`. U
 Copied attendance can also be applied back to the **same editable session** to restore accidental changes. Already-recorded/disabled attendance and different classes, dates, users, or rosters remain protected. Save is always manual.
 
 **Open attendance** navigates the current browser tab. Hold **Ctrl** while clicking to open the attendance page in a new background tab instead.
+
+Feedback appears beneath its originating section: attendance Copy/Apply under Attendance, filter/preset/backup messages under Saved classes, and date/settings or editor messages under their respective controls. Successful application notices disappear after two seconds; errors remain visible.
