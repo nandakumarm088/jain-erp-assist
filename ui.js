@@ -48,7 +48,7 @@
       return { options: data, source: hasLiveOptions ? "live" : cached ? "remembered" : "none", observedAt: cached?.observedAt };
     }
     function header() {
-      return `<header class="cf-header"><div class="cf-brand"><span class="cf-brand-icon">${icon("logo")}</span><span>ClassFlow</span><span class="cf-version">v${esc(chrome.runtime.getManifest().version)}</span></div>${connection()}</header>`;
+      return `<header class="cf-header"><div class="cf-brand"><span class="cf-brand-icon">${icon("logo")}</span><span>Jain ERP Assist</span><span class="cf-version">v${esc(chrome.runtime.getManifest().version)}</span></div>${connection()}</header>`;
     }
     function connection() {
       return `<div class="cf-connection ${state.connected ? "is-connected" : ""}" title="${esc(state.connection)}" aria-label="${esc(state.connection)}"><span class="cf-dot"></span>${state.connected ? '<span>Ready</span>' : '<button data-action="open-page" class="cf-text-button">Open page</button>'}</div>`;
@@ -128,7 +128,7 @@
       const view = draft ? "editor" : "library";
       const scroll = lastView === view ? container.querySelector(".cf-body")?.scrollTop || 0 : 0;
       lastView = view;
-      container.innerHTML = `<section class="cf-shell" aria-label="ClassFlow attendance presets">
+      container.innerHTML = `<section class="cf-shell" aria-label="Jain ERP Assist attendance filters and copying">
         ${header()}<div class="cf-body">${banners()}${draft ? editor() : runtimeControls() + library() + attendanceControls() + progress()}</div>
         ${!draft ? `<div class="cf-capture-zone"><button class="cf-capture" data-action="capture" ${busy || !state.connected || isRunning() ? "disabled" : ""}>${icon("capture")} Save this class</button><p class="cf-credit">Made by NK Developers</p></div>` : ''}</section>`;
       const body = container.querySelector(".cf-body");

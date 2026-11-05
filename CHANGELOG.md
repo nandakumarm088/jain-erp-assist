@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.4 - 2026-11-05
+
+- Rename the visible extension branding to Jain ERP Assist, with an independent-tool description.
+- Keep existing presets and copied attendance compatible.
+
 ## 1.1.3 - 2026-11-05
 
 - Restore the complete copied attendance pattern before each checkbox postback, including checked students accidentally unticked in the target session.

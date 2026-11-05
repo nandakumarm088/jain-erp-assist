@@ -1,4 +1,6 @@
-# ClassFlow
+# Jain ERP Assist
+
+An independent tool by NK Developers; not an official Jain extension.
 
 A new Manifest V3 extension for Jain's **Regular Class Attendance** page. Save a class's filters once and apply the entire sequence with one click.
 
@@ -6,10 +8,10 @@ A new Manifest V3 extension for Jain's **Regular Class Attendance** page. Save a
 
 1. In the dedicated Chrome profile, open `chrome://extensions`.
 2. If Attendance Date Setter is still installed from this root folder, remove that old entry. Its old files are preserved in `old/`.
-3. Enable Developer mode, choose **Load unpacked**, and select `E:\Personal_Projects\ERP_Filter_Extension` (the root, not `old/`). If ClassFlow is already loaded, just click Reload.
+3. Enable Developer mode, choose **Load unpacked**, and select `E:\Personal_Projects\ERP_Filter_Extension` (the root, not `old/`). If Jain ERP Assist is already loaded, just click Reload.
 4. Refresh the attendance page: <https://jained.jgianveshana.com/UI/Academics/Class%20Attendance/JVPL_Regular_Class_Attendance.aspx>.
 
-The extension is called **ClassFlow · Attendance presets**. Click its toolbar button to open Chrome's native side panel alongside the website. There is no floating panel or popup covering the page. Chrome 116 or newer is required. No build command is required.
+The extension is called **Jain ERP Assist · Attendance presets**. Click its toolbar button to open Chrome's native side panel alongside the website. There is no floating panel or popup covering the page. Chrome 116 or newer is required. No build command is required.
 
 Use the root folder for iterative development and Chrome testing. Do not create another ZIP unless the user explicitly requests one.
 
@@ -18,8 +20,8 @@ Use the root folder for iterative development and Chrome testing. Do not create 
 1. On the website, select Current/Previous Date, Theory/Lab, Attendance Type, and the class dropdowns **through Section**. Session No is optional.
 2. Click the extension button to open the side panel, then choose **Save this class**. Give the preset a short name, check its class dropdowns, and choose **Filters only**, **Theory**, or **Lab** before saving. The summary explains whether the preset will override the class type in Attendance settings.
 3. Choose the date and Theory/Lab in **Attendance settings** at the top. Saved class buttons sit directly below, each with a pencil button to edit its dropdowns.
-4. Click the saved class's **name** to apply it immediately. ClassFlow applies the current runtime settings first, then the saved dropdowns, waiting for each website refresh. There is no separate Apply button to find inside a card.
-5. When ClassFlow says the filters are applied, continue taking attendance on the website.
+4. Click the saved class's **name** to apply it immediately. Jain ERP Assist applies the current runtime settings first, then the saved dropdowns, waiting for each website refresh. There is no separate Apply button to find inside a card.
+5. When Jain ERP Assist says the filters are applied, continue taking attendance on the website.
 
 You can also choose **New preset** to build a class using remembered options. Options are learned only during an explicit **Save this class** capture or an active preset run. If an option has never been observed, select it on the website and capture the class again. A captured but incomplete class opens in the editor and cannot be saved until all required fields are supplied.
 
@@ -29,7 +31,7 @@ The panel uses the selected **Porcelain Blue** design: compact readable text, co
 
 **Current/Previous Date, the calendar date, and Attendance Type are never saved in a preset.** Theory/Lab is optional: the save editor offers **Filters only** (the default), **Theory**, or **Lab**, and states exactly what will be saved before the Save button. A saved Theory/Lab choice takes priority over Attendance settings; Filters only uses the class type selected there. Editing a preset lets you change or remove that override. This does not override the date or attendance type.
 
-Attendance settings are separate, per-tab settings for the current browser session and are copied into a job when a class button is clicked. Settings start from the last capture/remembered context, or Current Date / Theory if nothing has been captured. Opening the panel does not read the page. Changing settings does not change the website until you apply a class. **Attendance Type is entirely controlled by the website and the user:** ClassFlow does not read, capture, cache, save, select, or validate it. Any automatic changes caused by the website switching Theory/Lab remain the website's behavior. Historical attendance-type captures are removed on reload; saved class presets are retained, while remembered dropdown options are rebuilt on the next capture/run.
+Attendance settings are separate, per-tab settings for the current browser session and are copied into a job when a class button is clicked. Settings start from the last capture/remembered context, or Current Date / Theory if nothing has been captured. Opening the panel does not read the page. Changing settings does not change the website until you apply a class. **Attendance Type is entirely controlled by the website and the user:** Jain ERP Assist does not read, capture, cache, save, select, or validate it. Any automatic changes caused by the website switching Theory/Lab remain the website's behavior. Historical attendance-type captures are removed on reload; saved class presets are retained, while remembered dropdown options are rebuilt on the next capture/run.
 
 Existing presets retain their dropdowns and remain Filters only until you explicitly choose Theory or Lab. Older legacy mode/date/attendance-type fields are not restored. Changing a parent dropdown clears its dependent saved selections. Deleting a preset offers Undo.
 
@@ -41,11 +43,11 @@ Existing presets retain their dropdowns and remain Filters only until you explic
 - Full parent selections, mode, date policy, origin, and lecturer context form the cache key. At most 300 contexts are retained; the latest observed list replaces the older copy.
 - Jobs belong to a particular browser tab. They survive side-panel closure, full reloads, partial ASP.NET postbacks, and service worker restarts within the current browser session. They expire after five minutes. Closing the tab clears its job and runtime settings; restarting Chrome does not restart a job.
 - **Stop** prevents the next change. A request already sent to the website may still finish. The website's already selected filters remain in place.
-- Using the website's own filter controls stops an active preset. Mouse and keyboard events pass straight through; ClassFlow never cancels or delays the website's input handlers.
+- Using the website's own filter controls stops an active preset. Mouse and keyboard events pass straight through; Jain ERP Assist never cancels or delays the website's input handlers.
 - There are **no registered content scripts**, page-load injections, persistent filter listeners, or MutationObservers. Opening the panel, editing presets, changing runtime settings, and manually using the website do not execute page scripts. The panel checks only tab metadata and extension storage while idle.
 - **Save this class** performs a one-shot read and removes its helper immediately; it attaches no page callbacks. Only an active preset run attaches temporary ASP.NET postback callbacks and manual-input listeners. Success, Stop, manual takeover, errors, and timeouts remove those callbacks and delete the page helper. Refresh the ERP page once after upgrading to unload scripts injected by earlier versions.
 - The extension service worker owns active jobs and resumes them after reloads. A watchdog alarm exists only while a run is active and is cleared at termination. Closing the panel does not stop an authorized run. No timers or observers are left running on the website afterward.
-- ClassFlow only changes the allowlisted filter controls. It never clicks the website's Save, Edit, Cancel, Reset, Next Section, or Next Period buttons, nor reads or edits the student attendance grid.
+- Jain ERP Assist changes allowlisted filter controls and, during attendance Apply, student checkbox states. It never clicks the website's Save, Edit, Cancel, Reset, Next Section, or Next Period buttons, and only reads or edits student checkbox states during explicit attendance Copy/Apply operations.
 - Presets and dropdown options are stored in this Chrome profile using extension storage. There are no external fonts, analytics, or services.
 
 ## Project structure
@@ -94,7 +96,7 @@ Each fresh side-panel opening starts on Current Date and Theory. This only reset
 
 ## Versions
 
-The completed filter flow is **v1.0.0**, the baseline before attendance copying. The panel displays the installed manifest version beside ClassFlow. Keep manifest.json, package.json, and package-lock.json versions in sync. Use patch versions for fixes, minor versions for new compatible features, and major versions for breaking changes. Record releases in CHANGELOG.md and tag release commits in Git.
+The completed filter flow is **v1.0.0**, the baseline before attendance copying. The panel displays the installed manifest version beside Jain ERP Assist. Keep manifest.json, package.json, and package-lock.json versions in sync. Use patch versions for fixes, minor versions for new compatible features, and major versions for breaking changes. Record releases in CHANGELOG.md and tag release commits in Git.
 
 Attendance copying is available in **v1.1.0**, using **Student USN as the primary ID** and **Registration No as the secondary check**.
 
