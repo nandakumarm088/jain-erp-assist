@@ -15,6 +15,9 @@ const basePostback=__doPostBack;
 __doPostBack=function(key){
  if(!key.startsWith('student:'))return basePostback(key);
  const index=Number(key.split(':')[1]);
+ const forms=JSON.parse(sessionStorage.getItem('attendance-posted-forms')||'[]');
+ forms.push(students.map((student,index)=>({usn:student.usn,present:document.getElementById('Body_gdvStudents_chckselect_'+index).checked})));
+ sessionStorage.setItem('attendance-posted-forms',JSON.stringify(forms));
  if(!sessionStorage.getItem('drop-writes'))students[index].present=document.getElementById('Body_gdvStudents_chckselect_'+index).checked;
  sessionStorage.setItem('students',JSON.stringify(students));
  const writes=JSON.parse(sessionStorage.getItem('attendance-writes')||'[]');writes.push(students[index].usn);sessionStorage.setItem('attendance-writes',JSON.stringify(writes));

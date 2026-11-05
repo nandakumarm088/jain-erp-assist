@@ -137,8 +137,16 @@
     const next=window.ClassFlowAttendance.plan(copy,attendanceRead(),target);
     if (next.type==="error") throw new Error(next.message);
     if (next.type==="done") return {posted:false};
-    const row=studentRows().students.find(student=>student.usn.toUpperCase()===next.usn && student.registration.toUpperCase()===next.registration);
-    if (!row || row.element.disabled) throw new Error("The student row changed. Stopped; review the page.");
+    const rows=studentRows().students;
+    const row=rows.find(student=>student.usn.toUpperCase()===next.usn && student.registration.toUpperCase()===next.registration);
+    if (!row || rows.some(student=>student.element.disabled)) throw new Error("The student row changed. Stopped; review the page.");
+    const desired=new Map(copy.students.map(student=>[student.usn.trim().toUpperCase(),student]));
+    // Restore the WHOLE pattern, including present students accidentally unticked here.
+    // Leave one differing checkbox for a native click so ASP.NET submits the full form.
+    // Do not fire a separate postback for every other checkbox.
+    for (const student of rows) {
+      if (student.element !== row.element) student.element.checked=desired.get(student.usn.toUpperCase()).present;
+    }
     const posted=hasPostback(row.element);
     // Preserve the checkbox's own postback, without the row's Select$ postback.
     row.element.addEventListener("click",event=>event.stopPropagation(),{once:true});

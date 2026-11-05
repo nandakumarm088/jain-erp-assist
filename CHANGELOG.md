@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.3 - 2026-11-05
+
+- Restore the complete copied attendance pattern before each checkbox postback, including checked students accidentally unticked in the target session.
+- Verify the full roster after refresh; Save remains manual.
+- Add regression coverage for five copied absences plus extra unsaved target absences.
+
 ## 1.1.2 - 2026-11-05
 
 - Distinguish purple Copy / Copy again buttons from blue Apply buttons.
