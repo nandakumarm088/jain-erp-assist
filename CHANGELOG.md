@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2 - 2026-11-05
+
+- Distinguish purple Copy / Copy again buttons from blue Apply buttons.
+
 ## 1.1.1 - 2026-11-05
 
 - Give Copy attendance / Copy again the raised blue button style so available actions look clearly clickable.
