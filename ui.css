@@ -361,3 +361,33 @@ html,body,#app { margin:0; width:100%; min-width:0; max-width:100%; height:100%;
 
 .cf-preset-tools { display:flex; justify-content:flex-end; align-items:center; gap:7px; margin-top:8px; color:#6a7890; }
 .cf-preset-tools button { font-size:11px!important; }
+
+/* Intentional control colors: indigo dates, blue Theory, violet Lab. */
+.cf-segment { background:#e9edfb; border-color:#c9d2ee; }
+.cf-segment button { color:#384a75; }
+.cf-segment button:hover:not(:disabled) { background:#dce3fa; color:#243960; }
+.cf-segment .is-selected,.cf-segment .is-selected:hover:not(:disabled) { background:#4055bb; color:#fff; border-color:#3549a8; box-shadow:0 2px 5px #344da529; }
+.cf-segment .is-selected:hover:not(:disabled) { background:#3549a8; }
+.cf-segment [data-action="class-type"][data-value="theory"].is-selected,
+.cf-save-mode .cf-segment [data-value="theory"].is-selected { background:#215c9e; border-color:#194d89; color:#fff; }
+.cf-segment [data-action="class-type"][data-value="theory"].is-selected:hover:not(:disabled),
+.cf-save-mode .cf-segment [data-value="theory"].is-selected:hover:not(:disabled) { background:#194d89; }
+.cf-segment [data-action="class-type"][data-value="lab"].is-selected,
+.cf-save-mode .cf-segment [data-value="lab"].is-selected { background:#7040b7; border-color:#6033a2; color:#fff; box-shadow:0 2px 5px #6337a526; }
+.cf-segment [data-action="class-type"][data-value="lab"].is-selected:hover:not(:disabled),
+.cf-save-mode .cf-segment [data-value="lab"].is-selected:hover:not(:disabled) { background:#6033a2; }
+.cf-save-mode .cf-segment [data-value=""].is-selected,
+.cf-save-mode .cf-segment [data-value=""].is-selected:hover:not(:disabled) { background:#475569; border-color:#3a485b; color:#fff; }
+.cf-preset-apply { background:#dfe6ff; color:#263b82; border-color:#adbeef; box-shadow:0 2px 5px #4055bb12; }
+.cf-preset-apply:hover { background:#cfdafa; color:#1e3275; border-color:#8da5e4; }
+.cf-preset-apply:active { background:#c2d1f6; }
+.cf-preset[data-class-type="theory"] .cf-preset-apply { background:#dceaff; color:#214e88; border-color:#a7c4ec; }
+.cf-preset[data-class-type="theory"] .cf-preset-apply:hover { background:#cadfff; border-color:#8bb0e1; }
+.cf-preset[data-class-type="lab"] .cf-preset-apply { background:#e8dbff; color:#542c88; border-color:#c5ace9; box-shadow:0 2px 5px #7040b712; }
+.cf-preset[data-class-type="lab"] .cf-preset-apply:hover { background:#dcc8fa; border-color:#ad8cd9; }
+.cf-type-badge { background:#f0f6ff; color:#214e88; border-color:#abc4e8; }
+.cf-preset[data-class-type="lab"] .cf-type-badge { background:#f4ecff; color:#542c88; border-color:#c7afe5; }
+.cf-preset-edit { background:#dfe8fa; color:#2c4f88; border-color:#b5c8e7; }
+.cf-preset-edit:hover { background:#cdddf5; }
+.cf-preset[data-class-type="lab"] .cf-preset-edit { background:#e9defb; color:#61388f; border-color:#c8b4e5; }
+.cf-preset[data-class-type="lab"] .cf-preset-edit:hover { background:#ddcdf5; }

@@ -65,6 +65,11 @@ let context;
   },capture.snapshot);
   await panel.getByRole('button',{name:'PT LAB_B-2',exact:true}).waitFor();
   await panel.getByRole('button',{name:'Previous Date',exact:true}).click();
+  const selectedBg=await panel.locator('.cf-runtime .is-selected').first().evaluate(el=>getComputedStyle(el).backgroundColor);
+  assert.notEqual(selectedBg,'rgb(255, 255, 255)');
+  const savedColors=await panel.locator('.cf-preset-apply').evaluateAll(buttons=>buttons.map(el=>getComputedStyle(el).backgroundColor));
+  assert.notEqual(savedColors[0],savedColors[1]);assert.equal(savedColors.includes('rgb(255, 255, 255)'),false);
+
   const contrast=async selectors=>panel.evaluate(selectors=>{
     const color=text=>{const values=text.match(/[\d.]+/g).map(Number);return [...values.slice(0,3),values[3]??1];};
     const background=element=>{
@@ -91,6 +96,13 @@ let context;
   await panel.screenshot({path:path.join(root,'artifacts','modern-glass-main.png')});
   await panel.getByRole('button',{name:'Edit PT LAB_B-1',exact:true}).click();
   await panel.locator('#cf-name').waitFor();
+  const mode=panel.getByRole('group',{name:'Preset class type',exact:true});
+  for(const label of ['Filters only','Theory','Lab']){
+    await mode.getByRole('button',{name:label,exact:true}).click();
+    for(const item of await contrast(['.cf-save-mode .is-selected']))assert.ok(item.ratio>=4.5,JSON.stringify(item));
+    assert.notEqual(await panel.locator('.cf-save-mode .is-selected').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 255, 255)');
+  }
+
   for(const item of await contrast(['.cf-editor h1','.cf-editor-intro','.cf-label-row label','.cf-source','.cf-save-mode legend','.cf-save-mode p']))assert.ok(item.ratio>=4.5,JSON.stringify(item));
   await panel.screenshot({path:path.join(root,'artifacts','modern-glass-editor.png')});
   await panel.locator('.cf-save-mode').scrollIntoViewIfNeeded();

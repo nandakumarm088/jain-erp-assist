@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.2 - 2026-11-05
+
+- Replace white active selections with filled indigo Date, blue Theory, and violet Lab controls.
+- Add color-tinted saved class and edit buttons with matching Theory/Lab badges.
+- Keep compact layout, restrained glass, readable contrast, and existing behavior.
+
 ## 1.2.1 - 2026-11-05
 
 - Open attendance in the current browser tab by default; Ctrl-click opens a new background tab.
