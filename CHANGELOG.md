@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.7 - 2026-11-05
+
+- Slightly reduce working-area fonts, button heights, and section spacing while retaining the layout and button colors.
+
 ## 1.1.6 - 2026-11-05
 
 - Place Attendance Copy/Apply directly below branding, followed by attendance settings and saved classes.

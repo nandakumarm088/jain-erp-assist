@@ -247,3 +247,28 @@ html,body,#app { margin:0; width:100%; min-width:0; max-width:100%; height:100%;
 .cf-open-attendance svg { width:12px; height:12px; }
 .cf-open-attendance:hover { background:#dbe9ff; border-color:#7d9fcf; }
 .cf-open-attendance:active { background:#cbdfff; }
+
+/* Slightly denser working area; retain readable labels and clear button targets. */
+.cf-app { font-size:12px; }
+.cf-runtime-title h2,.cf-section-title h2 { font-size:13px; }
+.cf-attendance { padding:10px 12px; }
+.cf-runtime { padding:10px 12px 3px; }
+.cf-library,.cf-editor { padding:10px 12px; }
+.cf-runtime-title,.cf-section-title { margin-bottom:8px; }
+.cf-runtime .cf-form-field,.cf-form-field { margin-bottom:9px; }
+.cf-segment { padding:2px; gap:3px; }
+.cf-segment button { min-height:28px; padding:5px 4px; font-size:12px; }
+.cf-form-field>input,.cf-form-field select,.cf-runtime .cf-form-field select { padding:7px 9px; font-size:12px; }
+.cf-card-list { gap:9px; }
+.cf-preset-apply { min-height:32px; padding:7px 9px; font-size:12px!important; }
+.cf-preset-edit { min-width:30px; padding:6px; }
+.cf-preset-edit svg { width:14px; height:14px; }
+.cf-capture,.cf-primary { padding:7px 9px; font-size:12px!important; }
+.cf-capture-zone { padding:8px 12px 10px; }
+.cf-attendance-actions button { padding:6px 8px; }
+.cf-attendance-hint { margin-top:7px!important; }
+.cf-date-parts { gap:7px; margin-top:7px; }
+.cf-date-parts input { padding:6px; font-size:12px; }
+.cf-date-control input { margin:0; }
+.cf-editor h1 { font-size:18px; }
+.cf-banner,.cf-progress strong,.cf-progress p { font-size:12px; }
