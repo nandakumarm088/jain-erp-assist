@@ -37,6 +37,8 @@
     let removalTimer = null;
     let categoryFormOpen = false;
     let categoryName = "";
+    let editingCategory = null;
+    let pendingCategoryDelete = null;
     container.className = "cf-app";
     const isRunning = () => state.job?.status === "running";
     const context = () => state.snapshot || { ...(state.context || { origin: "https://jained.jgianveshana.com", account: "current-lecturer" }), ...draft?.scope };
@@ -110,7 +112,7 @@
       if (groups.has("uncategorized")) ordered.push(groups.get("uncategorized"));
       return ordered.map((group, index) => {
         const collapsed = !filter.trim() && (state.collapsedCategories || []).includes(group.key);
-        return `<section class="cf-category" data-category-key="${esc(group.key)}"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3><div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.length ? group.presets.map(card).join("") : '<p class="cf-category-empty">No classes yet.</p>'}</div></section>`;
+        return `<section class="cf-category" data-category-key="${esc(group.key)}"><div class="cf-category-heading"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3>${group.key !== "uncategorized" ? `<button type="button" class="cf-category-action" data-action="rename-category" data-name="${esc(group.name)}" aria-label="Rename category ${esc(group.name)}" title="Rename category" ${busy || isRunning() ? "disabled" : ""}>${icon("edit")}</button><button type="button" class="cf-category-action" data-action="ask-delete-category" data-name="${esc(group.name)}" data-category="${esc(group.key)}" aria-label="Delete category ${esc(group.name)}" title="Delete category" ${busy || isRunning() ? "disabled" : ""}>${icon("trash")}</button>` : ''}</div>${pendingCategoryDelete === group.key ? `<div class="cf-category-confirm" role="group" aria-label="Delete ${esc(group.name)}"><span>Classes move to Uncategorized.</span><button type="button" class="cf-text-button cf-category-confirm-delete" data-action="delete-category" data-name="${esc(group.name)}">Delete</button><button type="button" class="cf-text-button" data-action="cancel-delete-category">Cancel</button></div>` : ''}<div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.length ? group.presets.map(card).join("") : '<p class="cf-category-empty">No classes yet.</p>'}</div></section>`;
       }).join("") || '<div class="cf-no-results">No classes match your search.</div>';
     }
     function library() {
@@ -143,7 +145,7 @@
         ${!available.length && !field.multiple ? '<small class="cf-field-hint">Options are remembered as you select them on the website.</small>' : ''}</div>`;
     }
     function categoryCreator() {
-      return categoryFormOpen ? `<div class="cf-category-create" role="group" aria-label="Create category"><label for="cf-new-category">New category</label><div><input id="cf-new-category" maxlength="50" placeholder="e.g. Semester 5" value="${esc(categoryName)}" autocomplete="off"><button type="button" class="cf-primary" data-action="create-category" ${busy ? "disabled" : ""}>Create</button><button type="button" class="cf-icon-button" data-action="cancel-category" aria-label="Cancel new category">${icon("close")}</button></div></div>` : "";
+      return categoryFormOpen ? `<div class="cf-category-create" role="group" aria-label="${editingCategory ? "Rename category" : "Create category"}"><label for="cf-new-category">${editingCategory ? "Rename category" : "New category"}</label><div><input id="cf-new-category" maxlength="50" placeholder="e.g. Semester 5" value="${esc(categoryName)}" autocomplete="off"><button type="button" class="cf-primary" data-action="create-category" ${busy ? "disabled" : ""}>${editingCategory ? "Save" : "Create"}</button><button type="button" class="cf-icon-button" data-action="cancel-category" aria-label="${editingCategory ? "Cancel category rename" : "Cancel new category"}">${icon("close")}</button></div></div>` : "";
     }
     function editor() {
       const categories = state.categories || [];
@@ -177,7 +179,7 @@
       // Polling must not keep replacing focused inputs or disturb an open editor.
       return JSON.stringify([state.tabId, state.settings, state.collapsedCategories, state.categories, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
         state.job && [state.job.id, state.job.status, state.job.message, state.job.progress], draft ? state.cache : null,
-        draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice, errorSection, noticeSection, categoryFormOpen]);
+        draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice, errorSection, noticeSection, categoryFormOpen, editingCategory, pendingCategoryDelete]);
     }
     function update(next) {
       if (!next) return;
@@ -206,7 +208,7 @@
       finally { busy = false; render(); }
     }
     function startDraft(preset = null, capture = false) {
-      categoryFormOpen = false; categoryName = "";
+      categoryFormOpen = false; categoryName = ""; editingCategory = null; pendingCategoryDelete = null;
       const live = state.snapshot;
       draft = preset ? structuredClone(preset) : { name: "", category: "", classTypeOverride: null, fields: Object.fromEntries(Core.FIELDS.map(field => [field.key, capture ? structuredClone(live?.fields[field.key].selected || []) : []])),
         scope: { origin: context().origin, account: context().account } };
@@ -370,7 +372,7 @@
       const actionSection = ["copy-attendance", "apply-attendance", "clear-attendance"].includes(action) ? "attendance"
         : action === "stop" ? (state.job?.kind === "attendance" ? "attendance" : "library")
         : ["reset-date", "date-mode", "class-type", "open-page", "review-settings"].includes(action) ? "runtime"
-         : ["new-category", "create-category", "cancel-category"].includes(action) ? (draft ? "editor" : "library")
+         : ["new-category", "create-category", "cancel-category", "rename-category", "ask-delete-category", "delete-category", "cancel-delete-category"].includes(action) ? (draft ? "editor" : "library")
         : action === "capture" ? "capture" : ["new", "edit", "preset-type"].includes(action) ? "editor" : "library";
       try {
         await dateWrites;
@@ -384,15 +386,28 @@
           update(await request({type:{"copy-attendance":"COPY_ATTENDANCE","apply-attendance":"APPLY_ATTENDANCE","clear-attendance":"CLEAR_ATTENDANCE"}[action]}));
         }
         else if (action === "new-category") {
-          categoryFormOpen = true; categoryName = ""; error = "";
+          categoryFormOpen = true; categoryName = ""; editingCategory = null; pendingCategoryDelete = null; error = "";
           render(); container.querySelector("#cf-new-category")?.focus();
         }
-        else if (action === "cancel-category") { categoryFormOpen = false; categoryName = ""; }
+        else if (action === "cancel-category") { categoryFormOpen = false; categoryName = ""; editingCategory = null; }
         else if (action === "create-category") {
           busy = true; error = "";
-          const result = await request({ type: "CREATE_CATEGORY", name: categoryName });
+          const result = await request(editingCategory ? { type: "RENAME_CATEGORY", name: editingCategory, newName: categoryName } : { type: "CREATE_CATEGORY", name: categoryName });
           if (draft) draft.category = result.category;
-          categoryFormOpen = false; categoryName = ""; filter = ""; await refresh();
+          categoryFormOpen = false; categoryName = ""; editingCategory = null; filter = ""; await refresh();
+        }
+        else if (action === "rename-category") {
+          editingCategory = target.dataset.name; categoryName = editingCategory; categoryFormOpen = true; pendingCategoryDelete = null; error = "";
+          render(); const input = container.querySelector("#cf-new-category"); input?.focus(); input?.select();
+        }
+        else if (action === "ask-delete-category") { pendingCategoryDelete = target.dataset.category; categoryFormOpen = false; editingCategory = null; error = ""; }
+        else if (action === "cancel-delete-category") { pendingCategoryDelete = null; }
+        else if (action === "delete-category") {
+          busy = true; error = "";
+          await request({ type: "DELETE_CATEGORY", name: target.dataset.name });
+          pendingCategoryDelete = null; clearTimeout(removalTimer); removed = null;
+          notice = "Category removed. Its classes are uncategorized."; noticeSection = "library";
+          await refresh();
         }
         else if (action === "toggle-category") {
           const key = target.dataset.category;
@@ -416,7 +431,7 @@
           update(await request({ type: "CAPTURE" }));
           startDraft(null, true);
         }
-        else if (action === "back") { categoryFormOpen = false; categoryName = ""; draft = null; error = ""; notice = ""; render(); }
+        else if (action === "back") { categoryFormOpen = false; categoryName = ""; editingCategory = null; draft = null; error = ""; notice = ""; render(); }
         else if (action === "edit") { const preset = state.presets.find(item => item.id === target.dataset.id); if (preset) startDraft(preset); }
         else if (action === "preset-type") { draft.classTypeOverride = target.dataset.value || null; render(); }
         else if (action === "class-type" || action === "date-mode") {

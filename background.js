@@ -291,8 +291,36 @@ async function dispatch(message, sender) {
       return { category: existing || name };
     });
   }
+  if (message.type === "RENAME_CATEGORY" || message.type === "DELETE_CATEGORY") {
+    return serial("presets", async () => {
+      if (typeof message.name !== "string" || !message.name.trim()) throw new Error("Choose a category.");
+      const oldKey = Core.normalize(message.name);
+      const { presets, categories, collapsedCategories } = await readLocal();
+      if (!categories.some(category => Core.normalize(category) === oldKey)) throw new Error("This category no longer exists.");
+      const collapsed = new Set(collapsedCategories);
+      const oldCollapsedKey = `category:${oldKey}`;
+      if (message.type === "DELETE_CATEGORY") {
+        collapsed.delete(oldCollapsedKey);
+        const updated = presets.map(preset => Core.normalize(preset.category) === oldKey ? { ...preset, category: "" } : preset);
+        await chrome.storage.local.set({ "classflow.presets": updated, "classflow.categories": categories.filter(category => Core.normalize(category) !== oldKey), "classflow.collapsedCategories": [...collapsed] });
+        return { ok: true };
+      }
+      if (typeof message.newName !== "string" || !message.newName.trim() || message.newName.trim().replace(/\s+/g, " ").length > 50) throw new Error("Enter a category name of 1 to 50 characters.");
+      const newName = message.newName.trim().replace(/\s+/g, " ");
+      const newKey = Core.normalize(newName);
+      if (newKey !== oldKey && categories.some(category => Core.normalize(category) === newKey)) throw new Error("A category with that name already exists.");
+      if (newKey !== oldKey) {
+        const wasCollapsed = collapsed.has(oldCollapsedKey);
+        collapsed.delete(oldCollapsedKey); collapsed.delete(`category:${newKey}`);
+        if (wasCollapsed) collapsed.add(`category:${newKey}`);
+      }
+      const updated = presets.map(preset => Core.normalize(preset.category) === oldKey ? { ...preset, category: newName } : preset);
+      await chrome.storage.local.set({ "classflow.presets": updated, "classflow.categories": categories.map(category => Core.normalize(category) === oldKey ? newName : category), "classflow.collapsedCategories": [...collapsed] });
+      return { category: newName };
+    });
+  }
   if (message.type === "SET_CATEGORY_COLLAPSED") {
-    return serial("categories", async () => {
+    return serial("presets", async () => {
       if (typeof message.key !== "string" || message.key.length > 59 || (message.key !== "uncategorized" && !message.key.startsWith("category:")) || typeof message.collapsed !== "boolean") throw new Error("Invalid category selection.");
       const { collapsedCategories } = await readLocal();
       const collapsed = new Set(collapsedCategories);

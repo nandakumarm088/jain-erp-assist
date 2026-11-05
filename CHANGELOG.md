@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0 - 2026-11-05
+
+- Add category rename and deletion; deleting a category moves its presets to Uncategorized.
+- Replace boxed category headers with compact headings and divider lines.
+- Preserve preset data, category collapse state on rename, and backup compatibility.
+
 ## 1.4.0 - 2026-11-05
 
 - Create and save categories independently of presets, including empty groups.
