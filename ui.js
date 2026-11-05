@@ -58,7 +58,7 @@
       const disabled = busy || isRunning() || !state.connected ? "disabled" : "";
       const [year, month, day] = (settings.previousDate || `${state.previousYear || new Date().getFullYear()}--`).split("-");
       if (!dateEntry) dateEntry = { dayMonth: day ? `${day}/${month || ''}` : '', year };
-      return `<section class="cf-runtime" aria-label="Settings for this attendance"><div class="cf-runtime-title"><h2>Attendance settings</h2><button type="button" class="cf-open-attendance" data-action="open-page" title="Open Regular Class Attendance in a new tab" ${busy || isRunning() ? "disabled" : ""}>Open attendance ${icon("arrow")}</button></div>
+      return `<section class="cf-runtime" aria-label="Settings for this attendance"><div class="cf-runtime-title"><h2>Attendance settings</h2><button type="button" class="cf-open-attendance" data-action="open-page" title="Open attendance in this tab (Ctrl-click for a new tab)" ${busy || isRunning() ? "disabled" : ""}>Open attendance ${icon("arrow")}</button></div>
         <div class="cf-form-field"><label>Date</label><div class="cf-segment" role="group" aria-label="Date mode">${["current", "previous"].map(mode => `<button type="button" data-action="date-mode" data-value="${mode}" aria-pressed="${settings.dateMode === mode}" class="${settings.dateMode === mode ? "is-selected" : ""}" ${disabled}>${mode === "current" ? "Current Date" : "Previous Date"}</button>`).join("")}</div>
         ${settings.dateMode === "previous" ? `<div class="cf-date-parts" role="group" aria-label="Previous attendance date">
           <div class="cf-date-part"><label for="cf-date-daymonth">Day / Month</label><div class="cf-date-control"><input id="cf-date-daymonth" aria-label="Day / Month" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM" maxlength="5" value="${esc(dateEntry.dayMonth)}" ${disabled}><button type="button" class="cf-date-reset" data-action="reset-date" aria-label="Reset day and month" ${disabled}>Reset</button></div></div>
@@ -344,7 +344,7 @@
           setTimeout(() => URL.revokeObjectURL(url), 1000);
           removed = null; error = ""; notice = "Presets exported.";
         }
-        else if (action === "open-page") await request({ type: "OPEN_PAGE" });
+        else if (action === "open-page") await request({ type: "OPEN_PAGE", newTab: event.ctrlKey });
         else if (action === "review-settings") { container.querySelector(".cf-body").scrollTop = 0; container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true }); }
         else if (action === "new") startDraft();
         else if (action === "capture") {

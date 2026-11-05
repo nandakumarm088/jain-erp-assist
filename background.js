@@ -238,7 +238,11 @@ async function dispatch(message, sender) {
   await storageReady;
   const tabId = await resolveTab(message, sender);
   if (message.type === "OPEN_PAGE") {
-    await chrome.tabs.create({ url: PAGE });
+    if (message.newTab === true) await chrome.tabs.create({ url: PAGE, active: false });
+    else {
+      if (!Number.isInteger(tabId)) throw new Error("Select a browser tab before opening attendance.");
+      await chrome.tabs.update(tabId, { url: PAGE });
+    }
     return { ok: true };
   }
   if (message.type === "EXPORT_PRESETS") {

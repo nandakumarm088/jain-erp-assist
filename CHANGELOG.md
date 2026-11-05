@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 - 2026-11-05
+
+- Open attendance in the current browser tab by default; Ctrl-click opens a new background tab.
+
 ## 1.2.0 - 2026-11-05
 
 - Restore copied attendance in the same editable session as well as other sessions, with existing class/date/identity and roster checks intact.

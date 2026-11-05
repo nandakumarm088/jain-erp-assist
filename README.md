@@ -126,3 +126,5 @@ The project root is `E:\Personal_Projects\Jain ERP Assist`. A compatibility junc
 Use **Export** below Saved classes to download `jain-erp-assist-presets.json`. Use **Import** there to add presets from that backup. Existing classes are retained; exact duplicates are skipped. All entries are validated before any changes are written. Backups include names, saved filters, optional session choices, and optional Theory/Lab overrides, but no lecturer identity, copied student attendance, dates, or runtime settings. Imported options are still checked against the live website when applied.
 
 Copied attendance can also be applied back to the **same editable session** to restore accidental changes. Already-recorded/disabled attendance and different classes, dates, users, or rosters remain protected. Save is always manual.
+
+**Open attendance** navigates the current browser tab. Hold **Ctrl** while clicking to open the attendance page in a new background tab instead.
