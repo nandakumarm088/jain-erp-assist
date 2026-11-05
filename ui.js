@@ -91,12 +91,28 @@
     function card(preset) {
       return `<div class="cf-preset" data-class-type="${esc(preset.classTypeOverride || 'dynamic')}" data-preset-id="${esc(preset.id)}" draggable="${!busy && !isRunning()}"><button class="cf-preset-apply" aria-label="${esc(preset.name)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-action="apply" data-id="${esc(preset.id)}" title="Drag to reorder; Alt+Up/Down to move. Apply ${esc(preset.name)}${preset.classTypeOverride ? ` · Always ${preset.classTypeOverride === "lab" ? "Lab" : "Theory"}` : ''}" ${!state.connected || busy || isRunning() ? "disabled" : ""}><span class="cf-preset-name">${esc(preset.name)}</span>${preset.classTypeOverride ? `<span class="cf-type-badge" aria-hidden="true">${preset.classTypeOverride === "lab" ? "Lab" : "Theory"}</span>` : ''}</button><button class="cf-icon-button cf-preset-edit" data-action="edit" data-id="${esc(preset.id)}" aria-label="Edit ${esc(preset.name)}" ${busy || isRunning() ? "disabled" : ""}>${icon("edit")}</button></div>`;
     }
+    const categoryKey = preset => preset?.category ? `category:${Core.normalize(preset.category)}` : "uncategorized";
+    function classGroups(presets) {
+      if (!state.presets.some(preset => preset.category)) return presets.map(card).join("");
+      const groups = new Map();
+      for (const preset of presets) {
+        const key = categoryKey(preset);
+        if (!groups.has(key)) groups.set(key, { key, name: preset.category || "Uncategorized", presets: [] });
+        groups.get(key).presets.push(preset);
+      }
+      const ordered = [...groups.values()].filter(group => group.key !== "uncategorized");
+      if (groups.has("uncategorized")) ordered.push(groups.get("uncategorized"));
+      return ordered.map((group, index) => {
+        const collapsed = !filter.trim() && (state.collapsedCategories || []).includes(group.key);
+        return `<section class="cf-category" data-category-key="${esc(group.key)}"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3><div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.map(card).join("")}</div></section>`;
+      }).join("");
+    }
     function library() {
-      const presets = state.presets.filter(preset => Core.normalize(`${preset.name} ${labelOf(preset, "course")} ${labelOf(preset, "section")}`).includes(Core.normalize(filter)));
+      const presets = state.presets.filter(preset => Core.normalize(`${preset.name} ${preset.category || ""} ${labelOf(preset, "course")} ${labelOf(preset, "section")}`).includes(Core.normalize(filter)));
       return `<div class="cf-library">
         <div class="cf-section-title"><h2>Saved classes <span>${state.presets.length.toString().padStart(2, "0")}</span></h2><button class="cf-text-button" data-action="new" ${isRunning() ? "disabled" : ""}>${icon("plus")} New preset</button></div>
         ${state.presets.length > 6 ? `<label class="cf-search">${icon("search")}<input id="cf-search" placeholder="Find a class…" value="${esc(filter)}" aria-label="Find a saved class"></label>` : ''}
-        <div class="cf-card-list">${presets.length ? presets.map(card).join("") : state.presets.length ? '<div class="cf-no-results">No classes match your search.</div>' : `<div class="cf-empty"><h3>No saved classes</h3><p>Select your class on the website, then use Save this class.</p></div>`}</div>
+        <div class="cf-card-list">${presets.length ? classGroups(presets) : state.presets.length ? '<div class="cf-no-results">No classes match your search.</div>' : `<div class="cf-empty"><h3>No saved classes</h3><p>Select your class on the website, then use Save this class.</p></div>`}</div>
         <div class="cf-preset-tools" aria-label="Preset backups"><button type="button" class="cf-text-button" data-action="export-presets" aria-label="Export presets" title="Download a preset backup" ${busy || isRunning() || !state.presets.length ? "disabled" : ""}>Export</button><span aria-hidden="true">&middot;</span><button type="button" class="cf-text-button" data-action="import-presets" aria-label="Import presets" title="Import presets without replacing existing classes" ${busy || isRunning() ? "disabled" : ""}>Import</button><input type="file" id="cf-import-file" accept=".json,application/json" hidden></div>
       </div>`;
     }
@@ -120,9 +136,11 @@
         ${!available.length && !field.multiple ? '<small class="cf-field-hint">Options are remembered as you select them on the website.</small>' : ''}</div>`;
     }
     function editor() {
+      const categories = [...new Map(state.presets.filter(preset => preset.category).map(preset => [Core.normalize(preset.category), preset.category])).values()];
       return `<div class="cf-editor"><button class="cf-back" data-action="back">${icon("back")} Saved classes</button>
         <h1>${draft.id ? "Edit class" : "Save class"}</h1><p class="cf-editor-intro">Save your class filters. Session No and a fixed class type are optional.</p>
         <form id="cf-form"><div class="cf-form-field"><label for="cf-name">Class name</label><input id="cf-name" placeholder="e.g. Cyber Security · Lab 1" maxlength="80" value="${esc(draft.name)}" required autocomplete="off"></div>
+        <div class="cf-form-field"><label for="cf-category">Category <small class="cf-optional">Optional</small></label><input id="cf-category" list="cf-categories" placeholder="e.g. Semester 5" maxlength="50" value="${esc(draft.category || '')}" autocomplete="off"><datalist id="cf-categories">${categories.map(name => `<option value="${esc(name)}"></option>`).join("")}</datalist></div>
         ${Core.FIELDS.map(fieldEditor).join("")}
         <fieldset class="cf-save-mode"><legend>Class type <span class="cf-optional">Optional</span></legend><div class="cf-segment" role="group" aria-label="Preset class type">${[["", "Filters only"], ["theory", "Theory"], ["lab", "Lab"]].map(([value,label]) => `<button type="button" data-action="preset-type" data-value="${value}" aria-pressed="${(draft.classTypeOverride || "") === value}" class="${(draft.classTypeOverride || "") === value ? "is-selected" : ""}">${label}</button>`).join("")}</div><p id="cf-save-summary" role="status">${draft.classTypeOverride ? `Saving as <strong>${draft.classTypeOverride === "lab" ? "Lab" : "Theory"}</strong>. This overrides the class type in Attendance settings.` : 'Saving <strong>filters only</strong>. Theory/Lab will use Attendance settings.'}</p></fieldset>
         <div class="cf-editor-actions">${draft.id ? `<button type="button" class="cf-icon-button cf-delete" data-action="delete" data-id="${esc(draft.id)}" aria-label="Delete this preset">${icon("trash")}</button>` : ''}<button type="button" class="cf-secondary" data-action="back">Cancel</button><button type="submit" class="cf-primary" ${busy ? "disabled" : ""}>${busy ? "Saving…" : "Save preset"}${icon("check")}</button></div></form></div>`;
@@ -147,7 +165,7 @@
     }
     function signature() {
       // Polling must not keep replacing focused inputs or disturb an open editor.
-      return JSON.stringify([state.tabId, state.settings, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
+      return JSON.stringify([state.tabId, state.settings, state.collapsedCategories, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
         state.job && [state.job.id, state.job.status, state.job.message, state.job.progress], draft ? state.cache : null,
         draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice, errorSection, noticeSection]);
     }
@@ -179,7 +197,7 @@
     }
     function startDraft(preset = null, capture = false) {
       const live = state.snapshot;
-      draft = preset ? structuredClone(preset) : { name: "", classTypeOverride: null, fields: Object.fromEntries(Core.FIELDS.map(field => [field.key, capture ? structuredClone(live?.fields[field.key].selected || []) : []])),
+      draft = preset ? structuredClone(preset) : { name: "", category: "", classTypeOverride: null, fields: Object.fromEntries(Core.FIELDS.map(field => [field.key, capture ? structuredClone(live?.fields[field.key].selected || []) : []])),
         scope: { origin: context().origin, account: context().account } };
       error = ""; notice = ""; errorSection = noticeSection = "editor";
       if (capture) {
@@ -228,6 +246,7 @@
       }
 
       if (event.target.id === "cf-name") draft.name = event.target.value;
+      if (event.target.id === "cf-category") draft.category = event.target.value;
       if (event.target.id === "cf-search") { filter = event.target.value; render(); }
     });
     container.addEventListener("change", async event => {
@@ -298,6 +317,7 @@
     container.addEventListener("dragover", event => {
       const row = event.target.closest("[data-preset-id]");
       if (!draggedPreset || !row || row.dataset.presetId === draggedPreset || busy || isRunning()) return;
+      if (categoryKey(state.presets.find(preset => preset.id === draggedPreset)) !== categoryKey(state.presets.find(preset => preset.id === row.dataset.presetId))) { clearDrag(); return; }
       event.preventDefault(); event.dataTransfer.dropEffect = "move";
       clearDrag();
       row.classList.add(event.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2 ? "cf-drop-before" : "cf-drop-after");
@@ -309,7 +329,7 @@
       const from = draggedPreset; draggedPreset = null;
       const after = event.clientY >= row.getBoundingClientRect().top + row.offsetHeight / 2;
       clearDrag();
-      if (from === row.dataset.presetId) return;
+      if (from === row.dataset.presetId || categoryKey(state.presets.find(preset => preset.id === from)) !== categoryKey(state.presets.find(preset => preset.id === row.dataset.presetId))) return;
       const ids = state.presets.map(preset => preset.id).filter(id => id !== from);
       ids.splice(ids.indexOf(row.dataset.presetId) + Number(after), 0, from);
       try { await reorderPresets(ids); } catch (failure) { error = failure.message; errorSection = "library"; render(); }
@@ -320,9 +340,12 @@
       if (!button || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key) || busy || isRunning()) return;
       event.preventDefault();
       const ids = state.presets.map(preset => preset.id);
-      const index = ids.indexOf(button.dataset.id), next = index + (event.key === "ArrowUp" ? -1 : 1);
-      if (next < 0 || next >= ids.length) return;
-      [ids[index], ids[next]] = [ids[next], ids[index]];
+      const current = state.presets.find(preset => preset.id === button.dataset.id);
+      const group = state.presets.filter(preset => categoryKey(preset) === categoryKey(current)).map(preset => preset.id);
+      const groupIndex = group.indexOf(button.dataset.id), next = groupIndex + (event.key === "ArrowUp" ? -1 : 1);
+      if (next < 0 || next >= group.length) return;
+      const index = ids.indexOf(button.dataset.id), nextIndex = ids.indexOf(group[next]);
+      [ids[index], ids[nextIndex]] = [ids[nextIndex], ids[index]];
       try { await reorderPresets(ids); container.querySelector(`[data-action="apply"][data-id="${CSS.escape(button.dataset.id)}"]`)?.focus(); }
       catch (failure) { error = failure.message; errorSection = "library"; render(); }
     });
@@ -345,6 +368,11 @@
         else if (["copy-attendance","apply-attendance","clear-attendance"].includes(action)) {
           error=""; notice=""; busy=true; render();
           update(await request({type:{"copy-attendance":"COPY_ATTENDANCE","apply-attendance":"APPLY_ATTENDANCE","clear-attendance":"CLEAR_ATTENDANCE"}[action]}));
+        }
+        else if (action === "toggle-category") {
+          const key = target.dataset.category;
+          await request({ type: "SET_CATEGORY_COLLAPSED", key, collapsed: !(state.collapsedCategories || []).includes(key) });
+          await refresh();
         }
         else if (action === "export-presets") {
           const { backup } = await request({ type: "EXPORT_PRESETS" });

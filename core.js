@@ -27,6 +27,7 @@
   };
   function validatePreset(preset) {
     if (!preset?.name?.trim()) return "Give this class a name.";
+    if (preset.category != null && (typeof preset.category !== "string" || preset.category.trim().replace(/\s+/g, " ").length > 50)) return "Use a category name of 50 characters or fewer.";
     if (preset.name.length > 80) return "Use a class name of 80 characters or fewer.";
     if (preset.classTypeOverride != null && !["theory", "lab"].includes(preset.classTypeOverride)) return "Choose Filters only, Theory, or Lab.";
     for (const field of FIELDS) {
@@ -40,7 +41,8 @@
     return "";
   }
   function cleanPreset(preset) {
-    return { id: preset.id, name: preset.name, schemaVersion: 3,
+    return { id: preset.id, name: preset.name, schemaVersion: 4,
+      category: typeof preset.category === "string" ? preset.category.trim().replace(/\s+/g, " ") : "",
       classTypeOverride: ["theory", "lab"].includes(preset.classTypeOverride) ? preset.classTypeOverride : null,
       fields: Object.fromEntries(FIELDS.map(field => [field.key, (preset.fields?.[field.key] || []).map(({ value, label }) => ({ value, label }))])),
       scope: preset.scope ? { origin: preset.scope.origin, account: preset.scope.account } : undefined,
@@ -112,7 +114,7 @@
   function createPresetBackup(presets) {
     return { format: "jain-erp-assist-presets", version: 1, presets: presets.map(preset => {
       const clean = cleanPreset(preset);
-      return { name: clean.name, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
+      return { name: clean.name, category: clean.category, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
     }) };
   }
   function parsePresetBackup(text) {
@@ -127,11 +129,11 @@
       if (error) throw new Error(`Preset ${index + 1}: ${error}`);
       const clean = cleanPreset(preset);
       // Portable backups contain class filters only, never identity or attendance data.
-      return { name: clean.name.trim(), classTypeOverride: clean.classTypeOverride, fields: clean.fields };
+      return { name: clean.name.trim(), category: clean.category, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
     });
   }
   function presetFingerprint(preset) {
-    return JSON.stringify([normalize(preset.name), preset.classTypeOverride || null,
+    return JSON.stringify([normalize(preset.name), normalize(preset.category), preset.classTypeOverride || null,
       FIELDS.map(field => (preset.fields[field.key] || []).map(choice => [choice.value, normalize(choice.label)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))]);
   }
   const api = { createPresetBackup, parsePresetBackup, presetFingerprint, FIELDS, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };

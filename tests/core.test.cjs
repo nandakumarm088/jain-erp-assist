@@ -183,3 +183,17 @@ test('preset imports reject malformed or invalid files before merging',()=>{
  backup.presets=[{name:3,fields:{}}];assert.throws(()=>Core.parsePresetBackup(JSON.stringify(backup)),/valid name/);
  assert.throws(()=>Core.parsePresetBackup('x'.repeat(1024*1024+1)),/1 MB/);
 });
+
+test('optional categories migrate, validate, and round-trip through backups',()=>{
+ const {preset,snapshot}=example();
+ assert.equal(Core.cleanPreset(preset).category,'');
+ preset.category='  Semester   5  ';
+ assert.equal(Core.cleanPreset(preset).category,'Semester 5');
+ assert.equal(Core.validatePreset(preset),'');assert.equal(Core.plan(preset,snapshot).type,'done');
+ const backup=Core.createPresetBackup([preset]);assert.equal(backup.presets[0].category,'Semester 5');
+ assert.equal(Core.parsePresetBackup(JSON.stringify(backup))[0].category,'Semester 5');
+ delete backup.presets[0].category;assert.equal(Core.parsePresetBackup(JSON.stringify(backup))[0].category,'');
+ assert.notEqual(Core.presetFingerprint({...preset,category:'Semester 3'}),Core.presetFingerprint({...preset,category:'Semester 5'}));
+ preset.category='x'.repeat(51);assert.match(Core.validatePreset(preset),/category name/);
+ preset.category={};assert.match(Core.validatePreset(preset),/category name/);
+});

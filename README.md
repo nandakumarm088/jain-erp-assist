@@ -130,3 +130,7 @@ Copied attendance can also be applied back to the **same editable session** to r
 **Open attendance** navigates the current browser tab. Hold **Ctrl** while clicking to open the attendance page in a new background tab instead.
 
 Feedback appears beneath its originating section: attendance Copy/Apply under Attendance, filter/preset/backup messages under Saved classes, and date/settings or editor messages under their respective controls. Successful application notices disappear after two seconds; errors remain visible.
+
+## Saved class categories
+
+In the preset editor, **Category** is optional: type a name such as Semester 5 or choose a previously used name. Presets with the same category appear in a collapsible group under Saved classes; uncategorized presets appear together below those groups. Expansion/collapse is remembered between panel/browser openings. With no categories, the original flat class list is retained. Search includes category names and temporarily expands matching groups. Drag or Alt+Up/Down reorders classes within a category; edit Category to move a class into another group or clear it to remove grouping. Export/Import preserves category assignments; older presets/backups remain uncategorized.

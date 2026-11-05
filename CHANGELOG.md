@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 - 2026-11-05
+
+- Add optional user-defined preset categories with collapsible groups and remembered expansion state.
+- Choose an existing category or type a new one while creating/editing a class; uncategorized classes remain available.
+- Include categories in preset backups and search, while keeping class reorder within each category.
+
 ## 1.2.3 - 2026-11-05
 
 - Place attendance status and errors directly below the Attendance card.

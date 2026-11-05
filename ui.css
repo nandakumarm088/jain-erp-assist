@@ -394,3 +394,15 @@ html,body,#app { margin:0; width:100%; min-width:0; max-width:100%; height:100%;
 
 .cf-section-feedback > .cf-banner,.cf-section-feedback > .cf-progress { margin:6px 8px 0; }
 .cf-capture-zone .cf-section-feedback > .cf-banner { margin:8px 0 0; }
+
+.cf-category { min-width:0; }
+.cf-category-toggle { display:flex; align-items:center; gap:5px; width:100%; padding:5px 7px; margin:0 0 7px; border:1px solid #cbd5e8; border-radius:6px; background:#e5ebf7; color:#30466a; font-size:11px!important; font-weight:650; text-align:left; }
+.cf-category-toggle:hover:not(:disabled) { background:#dbe4f5; }
+.cf-category-toggle:disabled { opacity:1; }
+.cf-category-name { flex:1; min-width:0; overflow-wrap:anywhere; }
+.cf-category-count { color:#526179; font-size:10px; font-weight:400; }
+.cf-category-chevron { display:flex; }
+.cf-category-chevron svg { height:12px; width:12px; }
+.cf-category-toggle[aria-expanded="true"] .cf-category-chevron { transform:rotate(90deg); }
+.cf-category-items { display:grid; gap:9px; min-width:0; }
+.cf-category-items[hidden] { display:none; }

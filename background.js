@@ -34,8 +34,8 @@ function serial(key, task) {
   return next.finally(() => { if (queues.get(key) === next) queues.delete(key); });
 }
 async function readLocal() {
-  const data = await chrome.storage.local.get(["classflow.presets", "classflow.cache", "classflow.context"]);
-  return { presets: (data["classflow.presets"] || []).map(Core.cleanPreset), cache: data["classflow.cache"] || {}, context: data["classflow.context"] || null };
+  const data = await chrome.storage.local.get(["classflow.presets", "classflow.cache", "classflow.context", "classflow.collapsedCategories"]);
+  return { collapsedCategories: (data["classflow.collapsedCategories"] || []).filter(key => typeof key === "string"), presets: (data["classflow.presets"] || []).map(Core.cleanPreset), cache: data["classflow.cache"] || {}, context: data["classflow.context"] || null };
 }
 async function pageCall(tabId, method, argument, active = false) {
   const execute = () => chrome.scripting.executeScript({ target: { tabId }, world: "MAIN",
@@ -277,6 +277,16 @@ async function dispatch(message, sender) {
       if (existing < 0) presets.push(preset); else presets[existing] = preset;
       await chrome.storage.local.set({ "classflow.presets": presets });
       return { ok: true, preset };
+    });
+  }
+  if (message.type === "SET_CATEGORY_COLLAPSED") {
+    return serial("categories", async () => {
+      if (typeof message.key !== "string" || message.key.length > 59 || (message.key !== "uncategorized" && !message.key.startsWith("category:")) || typeof message.collapsed !== "boolean") throw new Error("Invalid category selection.");
+      const { collapsedCategories } = await readLocal();
+      const collapsed = new Set(collapsedCategories);
+      if (message.collapsed) collapsed.add(message.key); else collapsed.delete(message.key);
+      await chrome.storage.local.set({ "classflow.collapsedCategories": [...collapsed] });
+      return { ok: true };
     });
   }
   if (message.type === "REORDER_PRESETS") {
