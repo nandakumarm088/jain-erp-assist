@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.9 - 2026-11-05
+
+- Show an explicitly green Ready badge on the attendance page.
+- Rename the project root to Jain ERP Assist and update the unpacked-extension path.
+
 ## 1.1.8 - 2026-11-05
 
 - Visual-only refresh with restrained glass surfaces, opaque form controls, dark readable text, and subtle shadows.

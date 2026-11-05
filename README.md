@@ -8,7 +8,7 @@ A new Manifest V3 extension for Jain's **Regular Class Attendance** page. Save a
 
 1. In the dedicated Chrome profile, open `chrome://extensions`.
 2. If Attendance Date Setter is still installed from this root folder, remove that old entry. Its old files are preserved in `old/`.
-3. Enable Developer mode, choose **Load unpacked**, and select `E:\Personal_Projects\ERP_Filter_Extension` (the root, not `old/`). If Jain ERP Assist is already loaded, just click Reload.
+3. Enable Developer mode, choose **Load unpacked**, and select `E:\Personal_Projects\Jain ERP Assist` (the root, not `old/`). If Jain ERP Assist is already loaded, just click Reload.
 4. Refresh the attendance page: <https://jained.jgianveshana.com/UI/Academics/Class%20Attendance/JVPL_Regular_Class_Attendance.aspx>.
 
 The extension is called **Jain ERP Assist · Attendance presets**. Click its toolbar button to open Chrome's native side panel alongside the website. There is no floating panel or popup covering the page. Chrome 116 or newer is required. No build command is required.
@@ -118,3 +118,5 @@ Run `node tests/attendance-browser.cjs` for the local synthetic full/partial-pos
 Tested the authenticated page at Previous Date **02/10/2026**, Theory, BCAN Honours, 2024-2027 batch, fifth semester, Cyber Security, Penetration Testing, section 5BCACSL, sessions 1 and 2 (75 students). Manual clicks issued both a row-selection and a checkbox postback. The extension suppressed the extra row postback and submitted the complete checked/unchecked pattern in one checkbox postback. The server returned the expected states; rechecks also survived a subsequent independent postback.
 
 The actual v1.1.3 Copy/Apply flow copied two absences from session 1 to session 2 and restored an extra accidental untick to present: 73 checked, 2 unchecked after the server response. All 75 starting checks, session 1, the original copied attendance, and normal Chrome were restored afterward. A request guard blocked Save operations throughout; no Save request was issued. This verifies checkbox registration through postbacks, **not final attendance persistence after Save**.
+
+The project root is `E:\Personal_Projects\Jain ERP Assist`. A compatibility junction at the former `ERP_Filter_Extension` path points to this folder so existing Chrome unpacked-extension registrations, extension IDs, stored presets, and the dedicated profile path remain valid. Open the new folder in your IDE; the compatibility link contains no separate project copy.

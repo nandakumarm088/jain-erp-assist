@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jain ERP Assist",
-  "version": "1.1.8",
+  "version": "1.1.9",
   "minimum_chrome_version": "116",
   "description": "Independent Jain ERP helper for class filters and attendance copying. Not an official Jain extension.",
   "permissions": [
