@@ -72,10 +72,10 @@
       if (!job || (job.status === "done" && Date.now() >= job.updatedAt + 2000)) return "";
       const running = job.status === "running";
       return `<section class="cf-progress cf-progress-${esc(job.status)}" role="status" aria-live="polite">
-        <div class="cf-progress-top"><strong>${running ? '<span class="cf-spinner"></span>' : icon(job.status === "done" ? "check" : "clock")}${esc(running ? job.preset.name : job.status === "done" ? "Filters applied" : job.status === "error" ? "Needs your attention" : "Run stopped")}</strong>
+        <div class="cf-progress-top"><strong>${running ? '<span class="cf-spinner"></span>' : icon(job.status === "done" ? "check" : "clock")}${esc(running ? job.preset.name : job.status === "done" ? (job.kind === "attendance" ? "Attendance applied" : "Filters applied") : job.status === "error" ? "Needs your attention" : "Run stopped")}</strong>
           ${running ? '<button class="cf-text-button" data-action="stop">Stop</button>' : ''}</div>
-        ${job.status !== "done" ? `<p>${esc(job.message)}</p>` : ''}${running ? `<div class="cf-meter" role="progressbar" aria-label="Applying class filters" aria-valuemin="0" aria-valuemax="11" aria-valuenow="${job.progress || 0}"><i style="width:${Math.max(4, (job.progress || 0) / 11 * 100)}%"></i></div><small>Checking each selection on the live page</small>` : ''}
-        ${job.status === "error" && !job.websiteMessage ? ["dateMode", "classType", "date"].includes(job.field)
+        ${job.status !== "done" ? `<p>${esc(job.message)}</p>` : ''}${running ? `<div class="cf-meter" role="progressbar" aria-label="Applying selections" aria-valuemin="0" aria-valuemax="${job.total || 11}" aria-valuenow="${job.progress || 0}"><i style="width:${Math.max(4, (job.progress || 0) / (job.total || 11) * 100)}%"></i></div><small>${job.kind === "attendance" ? "Review and Save on the website when finished" : "Checking each selection on the live page"}</small>` : ''}
+        ${job.status === "error" && job.kind !== "attendance" && !job.websiteMessage ? ["dateMode", "classType", "date"].includes(job.field)
           ? `<button class="cf-text-button" data-action="review-settings">Review attendance settings ${icon("arrow")}</button>`
           : `<button class="cf-text-button" data-action="edit" data-id="${esc(job.preset.id)}">Review this preset ${icon("arrow")}</button>` : ''}</section>`;
     }
@@ -92,6 +92,14 @@
         ${state.presets.length > 6 ? `<label class="cf-search">${icon("search")}<input id="cf-search" placeholder="Find a class…" value="${esc(filter)}" aria-label="Find a saved class"></label>` : ''}
         <div class="cf-card-list">${presets.length ? presets.map(card).join("") : state.presets.length ? '<div class="cf-no-results">No classes match your search.</div>' : `<div class="cf-empty"><h3>No saved classes</h3><p>Select your class on the website, then use Save this class.</p></div>`}</div>
       </div>`;
+    }
+    function attendanceControls() {
+      const copy=state.attendanceCopy;
+      const disabled=busy || isRunning() || !state.connected ? "disabled" : "";
+      return `<section class="cf-attendance" aria-label="Attendance copying"><div class="cf-section-title"><h2>Attendance</h2>${copy ? `<button class="cf-text-button" data-action="clear-attendance" aria-label="Clear copied attendance" ${busy || isRunning() ? "disabled" : ""}>Clear</button>` : ''}</div>
+        ${copy ? `<p class="cf-attendance-summary" title="${esc(copy.courseLabel)}">${esc(copy.sessionLabel)} &middot; ${copy.present} present &middot; ${copy.absent} absent<br><span>${esc(copy.date)}</span></p>` : ''}
+        <div class="cf-attendance-actions"><button class="cf-secondary" data-action="copy-attendance" ${disabled}>${copy ? "Copy again" : "Copy attendance"}</button>${copy ? `<button class="cf-primary" data-action="apply-attendance" ${disabled}>Apply to this session</button>` : ''}</div>
+        <p class="cf-attendance-hint">${copy ? "Apply to another session, then review and Save on the website." : "Mark absentees on the website, then copy for the next session."}</p></section>`;
     }
     function fieldEditor(field) {
       const data = fieldOptions(field);
@@ -121,7 +129,7 @@
       const scroll = lastView === view ? container.querySelector(".cf-body")?.scrollTop || 0 : 0;
       lastView = view;
       container.innerHTML = `<section class="cf-shell" aria-label="ClassFlow attendance presets">
-        ${header()}<div class="cf-body">${banners()}${draft ? editor() : runtimeControls() + library() + progress()}</div>
+        ${header()}<div class="cf-body">${banners()}${draft ? editor() : runtimeControls() + library() + attendanceControls() + progress()}</div>
         ${!draft ? `<div class="cf-capture-zone"><button class="cf-capture" data-action="capture" ${busy || !state.connected || isRunning() ? "disabled" : ""}>${icon("capture")} Save this class</button><p class="cf-credit">Made by NK Developers</p></div>` : ''}</section>`;
       const body = container.querySelector(".cf-body");
       if (body) body.scrollTop = scroll;
@@ -132,7 +140,7 @@
     }
     function signature() {
       // Polling must not keep replacing focused inputs or disturb an open editor.
-      return JSON.stringify([state.tabId, state.settings, state.connected, state.stable, state.connection, state.presets,
+      return JSON.stringify([state.tabId, state.settings, state.attendanceCopy, state.connected, state.stable, state.connection, state.presets,
         state.job && [state.job.id, state.job.status, state.job.message, state.job.progress], draft ? state.cache : null,
         draft ? state.snapshot && [state.snapshot.fields, state.snapshot.dateMode, state.snapshot.classType] : null, busy, error, notice]);
     }
@@ -304,6 +312,10 @@
           dateEntry.dayMonth = "";
           await saveSettings(dateSettings());
           container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true });
+        }
+        else if (["copy-attendance","apply-attendance","clear-attendance"].includes(action)) {
+          error=""; notice=""; busy=true; render();
+          update(await request({type:{"copy-attendance":"COPY_ATTENDANCE","apply-attendance":"APPLY_ATTENDANCE","clear-attendance":"CLEAR_ATTENDANCE"}[action]}));
         }
         else if (action === "open-page") await request({ type: "OPEN_PAGE" });
         else if (action === "review-settings") { container.querySelector(".cf-body").scrollTop = 0; container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true }); }

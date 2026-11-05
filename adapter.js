@@ -1,7 +1,7 @@
 /* Runs in the page's MAIN world, so ASP.NET and Chosen receive real change events. */
 (() => {
   "use strict";
-  if (window.__classFlowAdapter?.version === 3) return;
+  if (window.__classFlowAdapter?.version === 4) return;
   const pageId = crypto.randomUUID();
   let revision = 0;
   let requestBusy = false;
@@ -39,7 +39,7 @@
     const target = event.target;
     if (event.isTrusted && target instanceof Element && (target.matches(nativeSelector)
       || target.closest("label")?.control?.matches(nativeSelector)
-      || target.closest(".chzn-container,.chosen-container,.multiselect-native-select,#Body_ChklstSection"))) manualCancelled = true;
+      || target.closest(".chzn-container,.chosen-container,.multiselect-native-select,#Body_ChklstSection,[id$=\"_gdvStudents\"]"))) manualCancelled = true;
   };
   function start() {
     if (active) return;
@@ -63,6 +63,7 @@
       }
       active = false;
       delete window.__classFlowAdapter;
+      delete window.ClassFlowAttendance;
     }
   }
   function checkboxOptions(container) {
@@ -104,6 +105,45 @@
       radios: Object.fromEntries(Object.entries(radioIds).map(([key, id]) => [key, !!byId(id)])),
       fields, alreadyRecorded: alerts[0] || "", readAt: Date.now() };
     return lastSnapshot;
+  }
+  function studentRows() {
+    const table = byId("Body_gdvStudents");
+    if (!table) return { students:[], rosterError:"Select a session and load the student list first." };
+    if (table.querySelector('a[href*="Page$"]')) return { students:[], rosterError:"The student list is paginated. Load the full list before copying attendance." };
+    const headings = [...table.querySelectorAll("tr")].find(row=>row.querySelector("th"));
+    const labels = headings ? [...headings.cells].map(cell=>clean(cell.textContent).toLowerCase()) : [];
+    const usnIndex=labels.indexOf("student usn"), registrationIndex=labels.indexOf("registration no");
+    if (usnIndex<0 || registrationIndex<0) return {students:[],rosterError:"Could not identify Student USN and Registration No columns."};
+    const students=[];
+    for (const row of table.querySelectorAll("tr")) {
+      if (row.querySelector("th")) continue;
+      const checkbox=row.querySelector('input[type="checkbox"][id*="chckselect"]');
+      if (!checkbox) {
+        if (row.cells[usnIndex]?.textContent.trim()) return {students:[],rosterError:"A student row has no readable attendance checkbox."};
+        continue;
+      }
+      students.push({usn:clean(row.cells[usnIndex]?.textContent),registration:clean(row.cells[registrationIndex]?.textContent),present:checkbox.checked,disabled:checkbox.disabled,element:checkbox});
+    }
+    return {students,rosterError:""};
+  }
+  function attendanceRead() {
+    const snapshot=read();
+    if (snapshot.manualCancelled || snapshot.busy) return snapshot;
+    const {students,rosterError}=studentRows();
+    return {...snapshot,rosterError,students:students.map(({element,...student})=>student)};
+  }
+  function attendanceAct({copy,target}) {
+    if (!active || manualCancelled) throw new Error("Attendance application stopped. Try again when the page is ready.");
+    const next=window.ClassFlowAttendance.plan(copy,attendanceRead(),target);
+    if (next.type==="error") throw new Error(next.message);
+    if (next.type==="done") return {posted:false};
+    const row=studentRows().students.find(student=>student.usn.toUpperCase()===next.usn && student.registration.toUpperCase()===next.registration);
+    if (!row || row.element.disabled) throw new Error("The student row changed. Stopped; review the page.");
+    const posted=hasPostback(row.element);
+    // Preserve the checkbox's own postback, without the row's Select$ postback.
+    row.element.addEventListener("click",event=>event.stopPropagation(),{once:true});
+    row.element.click();
+    return {posted};
   }
   function change(element) {
     const posted = hasPostback(element);
@@ -159,5 +199,5 @@
     item.element.click();
     return { posted };
   }
-  window.__classFlowAdapter = { version: 3, read, act, start, stop };
+  window.__classFlowAdapter = { version: 4, read, act, attendanceRead, attendanceAct, start, stop };
 })();

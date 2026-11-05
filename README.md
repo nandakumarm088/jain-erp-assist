@@ -76,7 +76,7 @@ Checks cover named preset buttons at the top, native side-panel registration, se
 
 ### Current verification limit
 
-The adapter has now been checked against the user's supplied page HTML, including the actual hidden selects, lecturer ID, multiselect, and delayed inline postback handlers. **It has not yet been verified against the authenticated live ERP.** The supplied HTML contains the initial empty dependent dropdowns, so tests simulate the server responses for those lists; they are not a captured copy of all available site options.
+The adapter has now been checked against the user's supplied page HTML, including the actual hidden selects, lecturer ID, multiselect, and delayed inline postback handlers. **The user has live-verified the filter flow. The new attendance-copy flow still needs a live check.** The supplied HTML contains the initial empty dependent dropdowns, so tests simulate the server responses for those lists; they are not a captured copy of all available site options.
 
 The existing website message that attendance is already recorded is treated as an applied-filter outcome, not as a failed preset. The fixture tests that outcome; no live attendance was submitted.
 
@@ -96,4 +96,17 @@ Each fresh side-panel opening starts on Current Date and Theory. This only reset
 
 The completed filter flow is **v1.0.0**, the baseline before attendance copying. The panel displays the installed manifest version beside ClassFlow. Keep manifest.json, package.json, and package-lock.json versions in sync. Use patch versions for fixes, minor versions for new compatible features, and major versions for breaking changes. Record releases in CHANGELOG.md and tag release commits in Git.
 
-The planned attendance-copy feature will use **Student USN as the primary ID** and **Registration No as the secondary check**. Attendance copying is not implemented in v1.0.0.
+Attendance copying is available in **v1.1.0**, using **Student USN as the primary ID** and **Registration No as the secondary check**.
+
+## Copy attendance to another session
+
+1. Mark the first session on the website, then click **Copy attendance** in the panel **before saving**. The summary shows the source session/date and present/absent counts.
+2. Use the website's **Save**, then select the other session and wait for its student list.
+3. Click **Apply to this session**. The extension matches the full roster by USN, cross-checks registration numbers, and restores both checked and unchecked states. It waits through each required checkbox postback and verifies all states afterward.
+4. Review the list, make any needed changes, and click the website's **Save** yourself.
+
+The copy is kept locally across reloads, panel closure, and browser restarts until replaced with **Copy again** or removed with **Clear**. It is separate from presets. Clear does not change selections on the website.
+
+Apply requires the same lecturer, date, program, batch, semester, specialization, course, Theory/Lab mode, and sections, with a different session. Missing/extra students, duplicate/missing IDs, registration mismatches, paginated lists, disabled checkboxes, or already-recorded target attendance block application. **Stop** or manual changes stop further work; any selections already applied remain for review. No Save, Edit, Cancel, or master checkbox is clicked by the extension. No page monitoring runs while idle.
+
+Run `node tests/attendance-browser.cjs` for the local synthetic full/partial-postback attendance checks. `npm.cmd test` includes identity and context unit tests. Tests do not contact the real ERP or submit live attendance.

@@ -10,7 +10,7 @@ test('page adapter never exposes attendance submission, edit, reset, or cancella
   const context = { window, document: fakeDocument, crypto: { randomUUID: () => 'doc-1' },
     location: { pathname: '/UI/Academics/Class Attendance/JVPL_Regular_Class_Attendance.aspx', origin: 'https://example.test' }, CSS: { escape: s => s } };
   vm.runInNewContext(source, context);
-  assert.deepEqual(Object.keys(window.__classFlowAdapter).sort(), ['act', 'read', 'start', 'stop', 'version']);
+  assert.deepEqual(Object.keys(window.__classFlowAdapter).sort(), ['act', 'attendanceAct', 'attendanceRead', 'read', 'start', 'stop', 'version']);
   assert.throws(() => window.__classFlowAdapter.act({ field: 'save' }), /Start/);
   assert.doesNotMatch(source, /Body_btn(?:Save|Edit|Cancel|Reset)|requestSubmit\(|\.submit\(/);
 });

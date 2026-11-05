@@ -228,3 +228,11 @@ html,body,#app { margin:0; width:100%; min-width:0; max-width:100%; height:100%;
 
 .cf-version { color:#5c6d88; font-size:10px; font-weight:400; letter-spacing:0; white-space:nowrap; }
 @media(max-width:240px) { .cf-header .is-connected>span:nth-child(2) { display:none; } }
+
+.cf-attendance { padding:12px 14px; border-bottom:1px solid var(--cf-line); }
+.cf-attendance .cf-section-title { margin-bottom:8px; }
+.cf-attendance-summary { font-size:12px; margin-bottom:8px!important; color:#243e63; overflow-wrap:anywhere; }
+.cf-attendance-summary span,.cf-attendance-hint { font-size:11px; color:#5c6d88; }
+.cf-attendance-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.cf-attendance-actions button { flex:1; padding:7px 8px; font-size:12px!important; }
+.cf-attendance-hint { margin-top:9px!important; line-height:1.5; }
