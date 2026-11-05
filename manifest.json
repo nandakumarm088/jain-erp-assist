@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "ClassFlow · Attendance presets",
+  "version": "1.0.0",
+  "minimum_chrome_version": "116",
+  "description": "Save a class once. Apply its attendance filters through every page refresh.",
+  "permissions": ["storage", "scripting", "activeTab", "sidePanel", "alarms"],
+  "host_permissions": ["https://jained.jgianveshana.com/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Open ClassFlow side panel" },
+  "side_panel": { "default_path": "sidepanel.html" }
+}

@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Attendance Date Setter",
+  "version": "1.0.0",
+  "description": "Save, restore, and apply attendance filters on the ERP page",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://jained.jainuniversity.ac.in/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://jained.jainuniversity.ac.in/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

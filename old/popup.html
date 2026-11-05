@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Attendance Date Setter</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      width: 360px;
+      padding: 14px;
+      font-family: Arial, sans-serif;
+      background: #f8f9fb;
+      color: #1f2937;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(0,0,0,.08);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+
+    .icon-btn {
+      width: auto;
+      min-width: 52px;
+      height: 30px;
+      border: 0;
+      border-radius: 8px;
+      background: #eef2ff;
+      color: #1e3a8a;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+      padding: 0;
+    }
+
+    .icon-btn:hover { background: #dbeafe; }
+
+    .top-actions .icon-btn {
+      min-width: 44px;
+      padding: 0 8px;
+    }
+
+    .top-actions #websitePanelBtn {
+      min-width: 70px;
+    }
+
+    .row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .field { flex: 1; }
+
+    .inline-control {
+      display: flex;
+      gap: 6px;
+      align-items: stretch;
+    }
+
+    .inline-control input,
+    .inline-control select {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .mini-btn {
+      width: auto;
+      min-width: 48px;
+      padding: 0 9px;
+      border-radius: 8px;
+      font-size: 12px;
+      background: #eef2ff;
+      color: #1e3a8a;
+      white-space: nowrap;
+    }
+
+    .mini-btn:hover { background: #dbeafe; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #4b5563;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 9px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      background: #fff;
+    }
+
+    input:focus, select:focus { border-color: #2563eb; }
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 2px;
+    }
+
+    .hint {
+      font-size: 11px;
+      color: #6b7280;
+      margin: 2px 0 10px;
+    }
+
+    button {
+      border: 0;
+      font-weight: 600;
+      cursor: pointer;
+      background: #2563eb;
+      color: #fff;
+    }
+
+    button:hover { background: #1d4ed8; }
+
+    button:disabled {
+      opacity: .62;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .secondary {
+      margin-top: 8px;
+      background: #eef2ff;
+      color: #1e3a8a;
+    }
+
+    .secondary:hover { background: #dbeafe; }
+
+    .edit-btn {
+      margin-top: 8px;
+      background: #f3f4f6;
+      color: #374151;
+      font-size: 12px;
+    }
+
+    .edit-btn.active {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .preset-list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      margin: 8px 0 12px;
+    }
+
+    #dateHistory {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .preset-list button {
+      width: auto;
+    }
+
+    .date-history-item {
+      min-width: auto;
+      width: auto;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #e0ecff;
+      color: #1e3a8a;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid #d1d5db;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    #setDate {
+      margin: 14px 0;
+    }
+
+    #websiteReset {
+      display: block;
+      width: auto;
+      min-width: 112px;
+      margin: 18px auto 4px;
+      background: #da4453;
+      color: #fff;
+    }
+
+    #websiteReset:hover {
+      background: #c9303e;
+    }
+
+    #saveDefault {
+      background: #fbbf24;
+      color: #1f2937;
+    }
+
+    #saveDefault:hover {
+      background: #f59e0b;
+    }
+
+    .preset-wrap {
+      position: relative;
+      display: inline-flex;
+    }
+
+    .preset-btn,
+    .preset-item {
+      width: auto;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #e0ecff;
+      color: #1e3a8a;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .preset-btn:hover { background: #cfe0ff; }
+
+    .preset-del {
+      display: none;
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      width: 21px;
+      min-width: 21px;
+      max-width: 21px;
+      height: 21px;
+      min-height: 21px;
+      max-height: 21px;
+      aspect-ratio: 1 / 1;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      padding: 0;
+      background: #dc2626;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,.18);
+      appearance: none;
+      font-family: Arial, sans-serif;
+      font-size: 16px;
+      font-weight: 900;
+      line-height: 1;
+      z-index: 1;
+    }
+
+    .preset-del:hover {
+      background: #b91c1c;
+      transform: scale(1.04);
+    }
+
+    .preset-wrap.editing .preset-del {
+      display: inline-grid;
+      place-items: center;
+    }
+
+    .history-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin: 0 0 10px;
+    }
+
+    .history-row #dateHistory {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .clear-history {
+      width: auto;
+      min-width: 54px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #f3f4f6;
+      color: #374151;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .clear-history:hover { background: #e5e7eb; }
+
+    .empty-message {
+      font-size: 12px;
+      color: #6b7280;
+      padding: 8px 0;
+    }
+
+    .website-preset-list {
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      background: #f9fafb;
+      padding: 6px;
+    }
+
+    .website-preset-choice {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 6px;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+    }
+
+    .website-preset-choice:hover {
+      background: #eef2ff;
+    }
+
+    .website-preset-choice input {
+      width: auto;
+      margin: 0;
+      accent-color: #2563eb;
+    }
+
+    .msg {
+      min-height: 18px;
+      font-size: 12px;
+      margin-top: 10px;
+    }
+
+    .msg.error { color: #dc2626; }
+    .msg.success { color: #059669; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,.28);
+      padding: 14px;
+    }
+
+    .modal.show { display: flex; }
+
+    .modal-box {
+      width: 100%;
+      position: relative;
+      z-index: 101;
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px;
+      box-shadow: 0 10px 24px rgba(0,0,0,.15);
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .modal-text {
+      font-size: 12px;
+      color: #4b5563;
+      margin-bottom: 12px;
+    }
+
+    .radio-group {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .radio-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: #374151;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .radio-label input {
+      width: auto;
+      margin: 0;
+      accent-color: #2563eb;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .muted {
+      font-size: 11px;
+      color: #6b7280;
+      margin-top: 8px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="topbar">
+      <h3>Set Attendance Filters</h3>
+      <div class="top-actions">
+        <button id="websitePanelBtn" class="icon-btn" title="Choose saved selections for the website floating box">Float Box</button>
+        <button id="refreshBtn" class="icon-btn" title="Reset working state">Reset</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="field">
+        <label for="date">Date</label>
+        <div class="inline-control">
+          <input id="date" type="text" placeholder="dd/mm" maxlength="5">
+          <button id="clearDate" class="mini-btn" title="Clear date">Clear</button>
+        </div>
+      </div>
+
+      <div class="field" style="max-width: 90px;">
+        <label for="year">Year</label>
+        <input id="year" type="text" maxlength="4">
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom: 10px;">
+      <label>Class Type</label>
+      <div class="radio-group">
+        <label class="radio-label"><input type="radio" name="attendanceType" value="theory" checked> Theory</label>
+        <label class="radio-label"><input type="radio" name="attendanceType" value="lab"> Lab</label>
+      </div>
+    </div>
+
+    <div class="history-row">
+      <div id="dateHistory" class="preset-list" style="margin:0; justify-content:flex-start;"></div>
+      <button id="clearDateHistory" class="clear-history" title="Clear recent dates">Clear</button>
+    </div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label for="program">Program</label>
+      <div class="inline-control">
+        <select id="program">
+          <option value="">Load programs...</option>
+        </select>
+        <button id="refreshPrograms" class="mini-btn" title="Get programs from current website page">Sync</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label for="academicBatch">Academic Batch</label>
+      <div class="inline-control">
+        <select id="academicBatch">
+          <option value="">Academic Batch</option>
+        </select>
+        <button id="refreshAcademicBatches" class="mini-btn" title="Get academic batches from current website page">Sync</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label for="courseSemester">Course Year / Semester</label>
+      <div class="inline-control">
+        <select id="courseSemester">
+          <option value="">Course Year / Semester</option>
+        </select>
+        <button id="refreshCourseSemesters" class="mini-btn" title="Get course year / semester from current website page">Sync</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label for="specialization">Specialization</label>
+      <div class="inline-control">
+        <select id="specialization">
+          <option value="">Specialization</option>
+        </select>
+        <button id="refreshSpecializations" class="mini-btn" title="Get specializations from current website page">Sync</button>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:10px;">
+      <label for="course">Course</label>
+      <div class="inline-control">
+        <select id="course">
+          <option value="">Course</option>
+        </select>
+        <button id="refreshCourses" class="mini-btn" title="Get courses from current website page">Sync</button>
+      </div>
+    </div>
+
+    <div id="presetList" class="preset-list"></div>
+
+    <button id="setDate">Set Filters</button>
+    <button id="websiteReset">Reset Website</button>
+    <button id="saveDefault" class="secondary">Save Current Selection</button>
+    <button id="editPresets" class="edit-btn">Edit Selections</button>
+
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+    <div class="muted">Sync gets the current dropdown options from the website</div>
+  </div>
+
+  <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="confirmModalTitle">
+    <div class="modal-box" tabindex="-1">
+      <div id="confirmModalTitle" class="modal-title">Delete selection?</div>
+      <div id="confirmText" class="modal-text"></div>
+      <div class="modal-actions">
+        <button id="confirmDelete">Delete</button>
+        <button id="cancelDelete" class="secondary" style="margin-top:0;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="saveModalTitle">
+    <div class="modal-box" tabindex="-1">
+      <div id="saveModalTitle" class="modal-title">Save selection</div>
+      <div class="modal-text">Enter a name for this program and batch selection.</div>
+      <input id="saveNameInput" type="text" placeholder="Example: BCA Regular">
+      <div class="modal-actions" style="margin-top:12px;">
+        <button id="confirmSave">Save</button>
+        <button id="cancelSave" class="secondary" style="margin-top:0;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="continueModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="continueModalTitle">
+    <div class="modal-box" tabindex="-1">
+      <div id="continueModalTitle" class="modal-title">Continue without date?</div>
+      <div id="continueText" class="modal-text">No date entered. Continue without setting date?</div>
+      <div class="modal-actions" style="margin-top:12px;">
+        <button id="continueYes">Continue</button>
+        <button id="continueNo" class="secondary" style="margin-top:0;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="websitePanelModal" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="websitePanelModalTitle">
+    <div class="modal-box" tabindex="-1">
+      <div id="websitePanelModalTitle" class="modal-title">Website floating box</div>
+      <div class="modal-text">Choose the saved selections to show on the attendance page.</div>
+      <div id="websitePresetList" class="website-preset-list"></div>
+      <div class="modal-actions" style="margin-top:12px;">
+        <button id="showWebsitePanel">Show Box</button>
+        <button id="hideWebsitePanel" class="secondary" style="margin-top:0;">Remove Box</button>
+        <button id="cancelWebsitePanel" class="secondary" style="margin-top:0;">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

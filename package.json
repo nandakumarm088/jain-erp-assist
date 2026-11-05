@@ -1,0 +1,12 @@
+{
+  "name": "classflow-extension",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/core.test.cjs tests/adapter.test.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
+  }
+}

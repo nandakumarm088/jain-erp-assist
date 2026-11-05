@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>ERP attendance fixture · local test</title>
+<style>body{font:14px 'Segoe UI',sans-serif;background:#eef5f6;color:#344552;margin:0;padding:36px}main{background:white;padding:28px;border:1px solid #dae5e9;border-radius:8px}h1{font-size:19px;font-weight:500;margin:0 0 30px}form{display:grid;grid-template-columns:repeat(4,1fr);gap:26px}label{display:block;font-size:12px;margin-bottom:8px}select,input[type=text]{width:100%;padding:12px;border:1px solid #d9e0e3;border-radius:4px;background:white;color:#566772}.radios{grid-column:1/-1;padding:15px 0;border-bottom:1px solid #eee}.radios label{display:inline-block;font-size:14px}.label{background:#35a9cc;color:white;padding:6px 10px;border-radius:3px}.alert{padding:15px;background:#fff3ce;margin:20px 0;color:#8d6727}.toolbar{margin-bottom:20px;display:flex;gap:10px}.toolbar button{padding:9px 20px;border:0;background:#2da78b;color:white;border-radius:4px}small{color:#9ba8b1}</style></head><body><main><small>LOCAL TEST FIXTURE — no connection to the ERP</small><h1>REGULAR CLASS ATTENDANCE</h1><div class="toolbar"><button id="Body_btnSave">Save</button><button id="Body_btnReset">Reset</button><button id="Body_btnEdit">Edit</button><button id="Body_btnCancel">Cancel</button></div><div id="notice"></div><form id="form1"><div class="radios"><label><input id="Body_rdCurrentDate" type="radio" name="date" onclick="mode('dateMode','current')">Current Date</label><label><input id="Body_rdNextDate" type="radio" name="date" onclick="mode('dateMode','previous')">Previous Date</label><label><input id="Body_rdTheory" type="radio" name="type" onclick="mode('classType','theory')">Theory</label><label><input id="Body_rdLab" type="radio" name="type" onclick="mode('classType','lab')">Lab</label></div><div><label>Attendance type</label><select id="Body_dwdlAttendanceType" onchange="__doPostBack('attendanceType')"></select></div><div><label>Lecturer</label><span class="label" id="Body_lblLecturer">FIXTURE LECTURER</span></div><div><label>Date</label><span id="Body_lbldate">05/11/2026</span><span id="date-input"></span></div><div><label>Program</label><select id="Body_ddlGraduationType" onchange="__doPostBack('program')"></select></div><div><label>Academic batch</label><select id="Body_ddlAcademicBatch" onchange="__doPostBack('batch')"></select></div><div><label>Academic year</label><select id="Body_ddlAcademicYear"><option>2026</option></select></div><div><label>Semester type</label><select id="Body_ddlSemesterType" disabled><option>odd</option></select></div><div><label>Course year / semester</label><select id="Body_ddlcourseyearsem" onchange="__doPostBack('semester')"></select></div><div><label>Specialization</label><select id="Body_ddlBranch" onchange="__doPostBack('specialization')"></select></div><div><label>Course</label><select id="Body_ddlsubject" onchange="__doPostBack('course')"></select></div><div><label>Section</label><div id="sections"></div></div><div><label>Session no.</label><select id="Body_ddlperiod" onchange="__doPostBack('session')"></select></div></form></main>
+<script>
+const fixtureFields = ['attendanceType','program','batch','semester','specialization','course','section','session'];
+const ids = { attendanceType:'Body_dwdlAttendanceType', program:'Body_ddlGraduationType',batch:'Body_ddlAcademicBatch',semester:'Body_ddlcourseyearsem',specialization:'Body_ddlBranch',course:'Body_ddlsubject',section:'Body_ChklstSection',session:'Body_ddlperiod' };
+const choices = { program:[['p1','BCAN:BACHELOR OF COMPUTER APPLICATIONS (HONOURS)']],batch:[['b1','2024-2027 · BCA Honours']],semester:[['sem5','5-FIFTH']],specialization:[['cyber','CS-CYBER SECURITY']],course:[['lab502','23BCACS502L: Cyber Security Lab']],section:[['section-lab1','5BCACSL-5BCACSL2L0001'],['section-lab2','5BCACSL-5BCACSL2L0002']],session:[['period1','1 · 07:50 to 08:40']] };
+let fixtureState = JSON.parse(sessionStorage.getItem('fixture') || 'null') || { dateMode:'current',classType:'theory',date:'05/11/2026',fields:{} };
+const checkboxMode = new URL(location.href).searchParams.has('checkboxes');
+const asyncMode = new URL(location.href).searchParams.has('async');
+const suppliedMarkup = new URL(location.href).searchParams.has('markup');
+const suppliedAttendance=suppliedMarkup?[...document.getElementById(ids.attendanceType).options].map(option=>[option.value,option.textContent]):null;
+if(suppliedMarkup){choices.program=[...document.getElementById(ids.program).options].filter(option=>option.value!=='0').map(option=>[option.value,option.textContent]);}
+const beginCallbacks=[],endCallbacks=[];let asyncBusy=false;
+window.Sys={WebForms:{PageRequestManager:{getInstance:()=>({add_beginRequest:fn=>beginCallbacks.push(fn),add_endRequest:fn=>endCallbacks.push(fn),remove_beginRequest:fn=>{const i=beginCallbacks.indexOf(fn);if(i>=0)beginCallbacks.splice(i,1);},remove_endRequest:fn=>{const i=endCallbacks.indexOf(fn);if(i>=0)endCallbacks.splice(i,1);},get_isInAsyncPostBack:()=>asyncBusy})}}};
+if(!document.getElementById(ids.section))document.getElementById('sections').innerHTML = checkboxMode ? '<div id="Body_ChklstSection"></div>' : '<select id="Body_ChklstSection" multiple onchange="__doPostBack(\'section\')"></select>';
+function renderFixture(){
+  document.getElementById(fixtureState.dateMode==='current'?'Body_rdCurrentDate':'Body_rdNextDate').checked=true;
+  document.getElementById(fixtureState.classType==='lab'?'Body_rdLab':'Body_rdTheory').checked=true;
+  document.getElementById('Body_lbldate').textContent=fixtureState.date;
+  document.getElementById('date-input').innerHTML=fixtureState.dateMode==='previous'?'<input id="Body_txtdDAad" type="text" value="'+fixtureState.date+'" onchange="__doPostBack(\'date\')">':'';
+  fixtureFields.forEach((key,index)=>{
+    const element=document.getElementById(ids[key]);
+    const enabled=index<2||fixtureFields.slice(1,index).every(parent=>fixtureState.fields[parent]?.length);
+    let available=key==='attendanceType'?(suppliedAttendance||[[fixtureState.classType==='lab'?'at-lab':'at-theory',fixtureState.classType==='lab'?'Regular Class Lab Attendance':'Regular Class Attendance'],['at-extra','Extra Class Attendance']]):enabled?choices[key]:[];
+    if(key==='session'&&sessionStorage.getItem('missing-session'))available=[['period2','2 · 08:40 to 09:30']];
+    if(key==='section'&&checkboxMode){element.innerHTML=available.map(([value,label],i)=>'<label for="section'+i+'"><input type="checkbox" id="section'+i+'" value="'+value+'" onclick="__doPostBack(\'section\')" '+(fixtureState.fields.section?.includes(value)?'checked':'')+'>'+label+'</label>').join('');}
+    else { element.innerHTML=(key==='attendanceType'?'':'<option value="">-- Select --</option>')+available.map(([value,label])=>'<option value="'+value+'" '+(fixtureState.fields[key]?.includes(value)?'selected':'')+'>'+label+'</option>').join(''); }
+    if(key==='attendanceType'&&!available.some(([value])=>fixtureState.fields[key]?.includes(value)))fixtureState.fields[key]=[available[0][0]];
+  });
+  document.getElementById('notice').innerHTML=fixtureState.fields.session?.length?'<div class="alert">For this 23BCACS502L you have Already Entered attendance For this Period: 1. Please click on edit/Cancel.</div>':'';
+}
+function mode(key,value){fixtureState[key]=value;fixtureState.fields={};if(key==='dateMode'&&value==='current')fixtureState.date='05/11/2026';commit(key);}
+function __doPostBack(key){
+ if(key.includes('$'))key=Object.keys(ids).find(field=>ids[field].replace('Body_','ctl00$Body$')===key)||key;
+ if(key==='date')fixtureState.date=document.getElementById('Body_txtdDAad').value;
+ else {
+  const element=document.getElementById(ids[key]);
+  fixtureState.fields[key]=key==='section'&&checkboxMode?[...element.querySelectorAll('input:checked')].map(x=>x.value):[...element.selectedOptions].map(x=>x.value).filter(Boolean);
+  const index=fixtureFields.indexOf(key);fixtureFields.slice(index+1).forEach(next=>{fixtureState.fields[next]=[];});
+ }
+ commit(key);
+}
+function commit(key){
+ const history=JSON.parse(sessionStorage.getItem('history')||'[]');history.push(key);sessionStorage.setItem('history',JSON.stringify(history));sessionStorage.setItem('fixture',JSON.stringify(fixtureState));
+ if(asyncMode){asyncBusy=true;beginCallbacks.forEach(fn=>fn());setTimeout(()=>{renderFixture();asyncBusy=false;endCallbacks.forEach(fn=>fn());},450);}
+ else setTimeout(()=>location.reload(),160);
+}
+document.querySelectorAll('.toolbar button').forEach(button=>button.onclick=()=>{sessionStorage.setItem('attendance-button-clicked','yes');});
+renderFixture();
+</script></body></html>
