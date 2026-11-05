@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.2 - 2026-11-05
+
+- Keep each open panel bound to its opening tab when other tabs or windows gain focus.
+- Disconnect when that tab closes instead of redirecting actions to another tab.
+
 ## 1.5.1 - 2026-11-05
 
 - Scroll new or changed section messages into view when hidden, without stealing keyboard focus or repeatedly overriding manual scrolling.

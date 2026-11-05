@@ -1,6 +1,6 @@
 {
   "name": "jain-erp-assist",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "private": true,
   "scripts": {
     "test": "node --test tests/core.test.cjs tests/adapter.test.cjs tests/attendance-core.test.cjs",
