@@ -76,7 +76,7 @@ Checks cover named preset buttons at the top, native side-panel registration, se
 
 ### Current verification limit
 
-The adapter has now been checked against the user's supplied page HTML, including the actual hidden selects, lecturer ID, multiselect, and delayed inline postback handlers. **The user has live-verified the filter flow. The new attendance-copy flow still needs a live check.** The supplied HTML contains the initial empty dependent dropdowns, so tests simulate the server responses for those lists; they are not a captured copy of all available site options.
+The adapter has now been checked against the user's supplied page HTML, including the actual hidden selects, lecturer ID, multiselect, and delayed inline postback handlers. **The filter flow and live attendance checkbox postbacks have been verified. Saving copied attendance remains deliberately untested.** The supplied HTML contains the initial empty dependent dropdowns, so tests simulate the server responses for those lists; they are not a captured copy of all available site options.
 
 The existing website message that attendance is already recorded is treated as an applied-filter outcome, not as a failed preset. The fixture tests that outcome; no live attendance was submitted.
 
@@ -110,3 +110,9 @@ The copy is kept locally across reloads, panel closure, and browser restarts unt
 Apply requires the same lecturer, date, program, batch, semester, specialization, course, Theory/Lab mode, and sections, with a different session. Missing/extra students, duplicate/missing IDs, registration mismatches, paginated lists, disabled checkboxes, or already-recorded target attendance block application. **Stop** or manual changes stop further work; any selections already applied remain for review. No Save, Edit, Cancel, or master checkbox is clicked by the extension. No page monitoring runs while idle.
 
 Run `node tests/attendance-browser.cjs` for the local synthetic full/partial-postback attendance checks. `npm.cmd test` includes identity and context unit tests. Tests do not contact the real ERP or submit live attendance.
+
+### Live checkbox verification - 2026-11-05
+
+Tested the authenticated page at Previous Date **02/10/2026**, Theory, BCAN Honours, 2024-2027 batch, fifth semester, Cyber Security, Penetration Testing, section 5BCACSL, sessions 1 and 2 (75 students). Manual clicks issued both a row-selection and a checkbox postback. The extension suppressed the extra row postback and submitted the complete checked/unchecked pattern in one checkbox postback. The server returned the expected states; rechecks also survived a subsequent independent postback.
+
+The actual v1.1.3 Copy/Apply flow copied two absences from session 1 to session 2 and restored an extra accidental untick to present: 73 checked, 2 unchecked after the server response. All 75 starting checks, session 1, the original copied attendance, and normal Chrome were restored afterward. A request guard blocked Save operations throughout; no Save request was issued. This verifies checkbox registration through postbacks, **not final attendance persistence after Save**.
