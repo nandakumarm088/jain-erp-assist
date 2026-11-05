@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.8 - 2026-11-05
+
+- Visual-only refresh with restrained glass surfaces, opaque form controls, dark readable text, and subtle shadows.
+- Distinct purple Copy, blue Apply, neutral saved classes, and dark Save this class buttons.
+- Preserve compact sizing, section order, and all existing behavior.
+
 ## 1.1.7 - 2026-11-05
 
 - Slightly reduce working-area fonts, button heights, and section spacing while retaining the layout and button colors.

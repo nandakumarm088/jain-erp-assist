@@ -272,3 +272,84 @@ html,body,#app { margin:0; width:100%; min-width:0; max-width:100%; height:100%;
 .cf-date-control input { margin:0; }
 .cf-editor h1 { font-size:18px; }
 .cf-banner,.cf-progress strong,.cf-progress p { font-size:12px; }
+
+/* Modern surfaces: restrained glass on the shell chrome and attendance card only. */
+.cf-sidepanel { background:#edf1f7; }
+.cf-app { --cf-ink:#19283e; --cf-muted:#526179; --cf-accent:#2859cf; --cf-line:#d6deea; --cf-paper:#f0f3f8; color:var(--cf-ink); }
+.cf-shell { background:radial-gradient(ellipse at 100% 0%,#e4e7fb 0,transparent 38%),radial-gradient(ellipse at 0% 65%,#e6effa 0,transparent 48%),#f0f3f8; }
+.cf-header { background:rgba(255,255,255,.82); backdrop-filter:blur(12px); border-bottom:1px solid #d6deea; }
+.cf-brand { color:#17263e; font-weight:700; }
+.cf-brand-icon { background:#2859cf; border:1px solid #214caf; border-radius:7px; box-shadow:0 2px 5px #243b6620; }
+.cf-header .cf-connection { color:#425777; }
+.cf-dot,.is-connected .cf-dot { background:#2c6a53; }
+.cf-version,.cf-credit { color:#526179; }
+.cf-body { scrollbar-color:#b4c0d3 transparent; }
+.cf-attendance,.cf-runtime { margin:6px 8px 0; padding:8px 10px; border:1px solid #d5deeb; border-radius:12px; }
+.cf-attendance { background:rgba(255,255,255,.83); backdrop-filter:blur(8px); box-shadow:inset 0 1px 0 #fff,0 3px 12px #293e6310; }
+.cf-runtime { background:#fff; box-shadow:0 2px 7px #293e6308; }
+.cf-library { background:transparent; border:0; padding:12px 10px 9px; }
+.cf-runtime-title h2,.cf-section-title h2 { color:#17263e; letter-spacing:-.15px; font-weight:650; }
+.cf-section-title h2 span { color:#526179; font-size:10px; }
+.cf-attendance-summary { color:#293a54; }
+.cf-attendance-summary span,.cf-attendance-hint { color:#526179; }
+.cf-form-field>label,.cf-label-row label { color:#344258; }
+.cf-segment { background:#edf0f6; border-color:#d3dce9; border-radius:8px; box-shadow:none; }
+.cf-segment button { color:#42516a; border-radius:6px; transition:background .12s,color .12s; }
+.cf-segment button:hover:not(:disabled) { color:#1c3764; background:#e0e7f3; }
+.cf-segment .is-selected,.cf-segment .is-selected:hover:not(:disabled) { background:#fff; color:#204ea9; border:1px solid #c7d3e7; box-shadow:0 1px 3px #2237561a; font-weight:650; }
+.cf-form-field>input,.cf-form-field select,.cf-runtime .cf-form-field select,.cf-date-parts input { background:#fff; color:#192b45; border-color:#9cacc3; border-radius:7px; box-shadow:none; }
+.cf-form-field input::placeholder,.cf-date-parts input::placeholder { color:#64738a; opacity:1; }
+.cf-date-parts label { color:#526179; }
+.cf-date-control { background:#fff; border-color:#9cacc3; border-radius:7px; }
+.cf-date-control input { border:0; border-radius:0; }
+.cf-date-reset { background:#eef2f9; color:#254b88; border-left-color:#c8d3e3; font-size:11px!important; }
+.cf-date-reset:hover { background:#dfe8f6; }
+.cf-date-reset:active { background:#d2def0; }
+.cf-primary,.cf-primary:hover { background:#2859cf; border:1px solid #204ebc; border-radius:8px; box-shadow:0 2px 5px #284e9720; font-weight:600!important; transition:background .12s,box-shadow .12s; }
+.cf-primary:hover:not(:disabled) { background:#204bb5; }
+.cf-primary:active { transform:translateY(1px); box-shadow:none; }
+.cf-copy,.cf-copy:hover { background:#6741ba; border-color:#5935a7; box-shadow:0 2px 5px #4c278d20; }
+.cf-copy:hover:not(:disabled) { background:#5733a5; }
+.cf-copy:active { box-shadow:none; }
+.cf-secondary { background:#f6f8fc; color:#344964; border-color:#b5c2d7; box-shadow:none; border-radius:7px; }
+.cf-secondary:hover { background:#e9eef7; }
+.cf-text-button { color:#2452ad; font-weight:550!important; }
+.cf-text-button:hover { color:#173a82; }
+.cf-open-attendance { background:#f3f6fc; color:#2452a3; border-color:#b9c9e1; border-radius:6px; box-shadow:none; font-weight:550; }
+.cf-open-attendance:hover { background:#e6edf9; border-color:#93acd2; }
+.cf-open-attendance:active { background:#dce7f8; }
+.cf-preset { gap:6px; }
+.cf-preset-apply { background:#fff; color:#192b45; border:1px solid #c5d1e3; border-radius:8px; box-shadow:0 1px 3px #283b5710; font-weight:600!important; transition:background .12s,border-color .12s; }
+.cf-preset-apply:hover { background:#f7f9ff; color:#173f8a; border-color:#8eabda; transform:none; }
+.cf-preset-apply:active { background:#eaf0fc; transform:translateY(1px); box-shadow:none; }
+.cf-type-badge { background:#edf2fd; color:#264f98; border:1px solid #cbd8ef; border-radius:4px; font-size:10px; }
+.cf-preset-edit { color:#3d5579; background:#f9fbff; border:1px solid #c5d1e3; border-radius:8px; box-shadow:0 1px 3px #283b5710; }
+.cf-preset-edit:hover { background:#e8effb; color:#244d95; }
+.cf-preset-edit:active { background:#dce7f8; }
+.cf-capture-zone { background:rgba(255,255,255,.84); backdrop-filter:blur(10px); border-top-color:#d5deeb; }
+.cf-capture,.cf-capture:hover { background:#27364f; color:#fff; border:1px solid #202e45; border-radius:8px; box-shadow:0 2px 5px #18294020; font-weight:600!important; }
+.cf-capture:hover:not(:disabled) { background:#354968; }
+.cf-capture:active { transform:translateY(1px); box-shadow:none; }
+.cf-empty { background:rgba(255,255,255,.64); border:1px dashed #b5c4db; color:#263c5e; border-radius:10px; padding:14px 9px; }
+.cf-empty p,.cf-no-results { color:#526179; }
+.cf-editor { background:transparent; }
+.cf-editor h1 { color:#19283e; }
+.cf-editor-intro,.cf-source,.cf-optional,.cf-field-hint,.cf-field-empty { color:#526179; }
+.cf-sections { background:#fff; border-color:#9cacc3; border-radius:8px; }
+.cf-section-choice { color:#293d5c; }
+.cf-section-choice input { accent-color:#2859cf; }
+.cf-save-mode { background:#fff; border-color:#ccd7e8; border-radius:10px; }
+.cf-save-mode legend { color:#293a54; }
+.cf-save-mode p { color:#435570; }
+.cf-save-mode strong { color:#254b96; }
+.cf-progress { background:#f1f6ff; border-color:#c2d3ee; border-radius:10px; box-shadow:0 2px 6px #293e6308; }
+.cf-progress strong { color:#204a91; }
+.cf-progress p,.cf-progress small { color:#435a7b; }
+.cf-error,.cf-progress-error { background:#fff5ed; border-color:#e2bfa7; color:#813b16; }
+.cf-progress-error strong { color:#813b16; }
+.cf-progress-error p { color:#813b16; }
+.cf-progress-stopped { background:#f2f4f8; border-color:#c8d2e1; }
+.cf-notice { background:#f1f6ff; color:#304f80; }
+.cf-meter { background:#dbe5f5; }
+.cf-meter i { background:#2859cf; }
+@supports not (backdrop-filter:blur(1px)) { .cf-header,.cf-attendance,.cf-capture-zone { background:#fff; } }
