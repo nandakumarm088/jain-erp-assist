@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.6 - 2026-11-05
+
+- Place Attendance Copy/Apply directly below branding, followed by attendance settings and saved classes.
+
 ## 1.1.5 - 2026-11-05
 
 - Replace the attendance settings caption with a compact Open attendance shortcut to the Regular Class Attendance page.

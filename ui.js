@@ -129,7 +129,7 @@
       const scroll = lastView === view ? container.querySelector(".cf-body")?.scrollTop || 0 : 0;
       lastView = view;
       container.innerHTML = `<section class="cf-shell" aria-label="Jain ERP Assist attendance filters and copying">
-        ${header()}<div class="cf-body">${banners()}${draft ? editor() : runtimeControls() + library() + attendanceControls() + progress()}</div>
+        ${header()}<div class="cf-body">${banners()}${draft ? editor() : attendanceControls() + runtimeControls() + library() + progress()}</div>
         ${!draft ? `<div class="cf-capture-zone"><button class="cf-capture" data-action="capture" ${busy || !state.connected || isRunning() ? "disabled" : ""}>${icon("capture")} Save this class</button><p class="cf-credit">Made by NK Developers</p></div>` : ''}</section>`;
       const body = container.querySelector(".cf-body");
       if (body) body.scrollTop = scroll;

@@ -23,6 +23,13 @@ let context;
   let panel=await context.newPage();
   await panel.addInitScript(tabId=>{const send=chrome.runtime.sendMessage.bind(chrome.runtime);chrome.runtime.sendMessage=message=>send({...message,tabId});},tabId);
   await panel.goto(`chrome-extension://${new URL(worker.url()).host}/sidepanel.html`);await panel.setViewportSize({width:360,height:900});
+  const checkOrder=async()=>{
+    const bounds=await panel.evaluate(()=>Object.fromEntries(['cf-header','cf-attendance','cf-runtime','cf-library'].map(name=>{const r=document.querySelector('.'+name).getBoundingClientRect();return [name,{top:r.top,bottom:r.bottom}];})));
+    assert.ok(bounds['cf-header'].bottom<=bounds['cf-attendance'].top);
+    assert.ok(bounds['cf-attendance'].bottom<=bounds['cf-runtime'].top);
+    assert.ok(bounds['cf-runtime'].bottom<=bounds['cf-library'].top);
+  };
+  await checkOrder();
   const source=[{usn:'TEST001',registration:'REG1',present:false},{usn:'TEST002',registration:'REG2',present:true},{usn:'TEST003',registration:'REG3',present:true},{usn:'TEST004',registration:'REG4',present:false}];
   const setup=async(students,session='period1',query='')=>{
     await site.evaluate(({students,session,complete})=>{
@@ -48,6 +55,9 @@ let context;
   await panel.getByRole('button',{name:'Copy attendance',exact:true}).click();
   await panel.getByText(/2 present.*2 absent/).waitFor();await detached();
   await panel.reload();await panel.getByRole('button',{name:'Apply to this session',exact:true}).waitFor();
+  await checkOrder();
+  await fs.mkdir(path.join(root,'artifacts'),{recursive:true});
+  await panel.screenshot({path:path.join(root,'artifacts','attendance-top.png')});
   const target=source.map(student=>({...student,present:true})).reverse();target.find(student=>student.usn==='TEST002').present=false;
   await setup(target,'period2');
   await panel.getByRole('button',{name:'Apply to this session',exact:true}).click();

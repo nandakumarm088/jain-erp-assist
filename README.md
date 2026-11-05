@@ -19,7 +19,7 @@ Use the root folder for iterative development and Chrome testing. Do not create 
 
 1. On the website, select Current/Previous Date, Theory/Lab, Attendance Type, and the class dropdowns **through Section**. Session No is optional.
 2. Click the extension button to open the side panel, then choose **Save this class**. Give the preset a short name, check its class dropdowns, and choose **Filters only**, **Theory**, or **Lab** before saving. The summary explains whether the preset will override the class type in Attendance settings.
-3. Choose the date and Theory/Lab in **Attendance settings** at the top. Saved class buttons sit directly below, each with a pencil button to edit its dropdowns.
+3. Choose the date and Theory/Lab in **Attendance settings** below the Attendance Copy/Apply section. Saved class buttons sit directly below, each with a pencil button to edit its dropdowns.
 4. Click the saved class's **name** to apply it immediately. Jain ERP Assist applies the current runtime settings first, then the saved dropdowns, waiting for each website refresh. There is no separate Apply button to find inside a card.
 5. When Jain ERP Assist says the filters are applied, continue taking attendance on the website.
 
