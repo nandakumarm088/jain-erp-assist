@@ -91,6 +91,7 @@
         <div class="cf-section-title"><h2>Saved classes <span>${state.presets.length.toString().padStart(2, "0")}</span></h2><button class="cf-text-button" data-action="new" ${isRunning() ? "disabled" : ""}>${icon("plus")} New preset</button></div>
         ${state.presets.length > 6 ? `<label class="cf-search">${icon("search")}<input id="cf-search" placeholder="Find a class…" value="${esc(filter)}" aria-label="Find a saved class"></label>` : ''}
         <div class="cf-card-list">${presets.length ? presets.map(card).join("") : state.presets.length ? '<div class="cf-no-results">No classes match your search.</div>' : `<div class="cf-empty"><h3>No saved classes</h3><p>Select your class on the website, then use Save this class.</p></div>`}</div>
+        <div class="cf-preset-tools" aria-label="Preset backups"><button type="button" class="cf-text-button" data-action="export-presets" aria-label="Export presets" title="Download a preset backup" ${busy || isRunning() || !state.presets.length ? "disabled" : ""}>Export</button><span aria-hidden="true">&middot;</span><button type="button" class="cf-text-button" data-action="import-presets" aria-label="Import presets" title="Import presets without replacing existing classes" ${busy || isRunning() ? "disabled" : ""}>Import</button><input type="file" id="cf-import-file" accept=".json,application/json" hidden></div>
       </div>`;
     }
     function attendanceControls() {
@@ -99,7 +100,7 @@
       return `<section class="cf-attendance" aria-label="Attendance copying"><div class="cf-section-title"><h2>Attendance</h2>${copy ? `<button class="cf-text-button" data-action="clear-attendance" aria-label="Clear copied attendance" ${busy || isRunning() ? "disabled" : ""}>Clear</button>` : ''}</div>
         ${copy ? `<p class="cf-attendance-summary" title="${esc(copy.courseLabel)}">${esc(copy.sessionLabel)} &middot; ${copy.present} present &middot; ${copy.absent} absent<br><span>${esc(copy.date)}</span></p>` : ''}
         <div class="cf-attendance-actions"><button class="cf-primary cf-copy" data-action="copy-attendance" ${disabled}>${copy ? "Copy again" : "Copy attendance"}</button>${copy ? `<button class="cf-primary" data-action="apply-attendance" ${disabled}>Apply to this session</button>` : ''}</div>
-        <p class="cf-attendance-hint">${copy ? "Apply to another session, then review and Save on the website." : "Mark absentees on the website, then copy for the next session."}</p></section>`;
+        <p class="cf-attendance-hint">${copy ? "Restore here or apply to another session. Review and Save on the website." : "Mark absentees on the website, then copy for the next session."}</p></section>`;
     }
     function fieldEditor(field) {
       const data = fieldOptions(field);
@@ -224,6 +225,22 @@
       if (event.target.id === "cf-search") { filter = event.target.value; render(); }
     });
     container.addEventListener("change", async event => {
+      if (event.target.id === "cf-import-file") {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file) return;
+        error = ""; notice = ""; removed = null;
+        try {
+          if (file.size > 1024 * 1024) throw new Error("Choose a preset backup smaller than 1 MB.");
+          busy = true; render();
+          const result = await request({ type: "IMPORT_PRESETS", text: await file.text() });
+          notice = `Added ${result.added} preset${result.added === 1 ? "" : "s"}; ${result.skipped} duplicate${result.skipped === 1 ? "" : "s"} skipped.`;
+          await refresh();
+        } catch (failure) { error = failure.message; }
+        finally { busy = false; render(); }
+        return;
+      }
+
       if (["cf-date-daymonth", "cf-date-year"].includes(event.target.id)) {
         const settings = dateSettings();
         const yearOverride = event.target.id === "cf-date-year" && /^[1-9]\d{3}$/.test(dateEntry.year) ? dateEntry.year : undefined;
@@ -306,6 +323,7 @@
       const target = event.target.closest("[data-action]");
       if (!target || target.disabled) return;
       const action = target.dataset.action;
+      if (action === "import-presets") { container.querySelector("#cf-import-file").click(); return; }
       try {
         await dateWrites;
         if (action === "reset-date") {
@@ -316,6 +334,15 @@
         else if (["copy-attendance","apply-attendance","clear-attendance"].includes(action)) {
           error=""; notice=""; busy=true; render();
           update(await request({type:{"copy-attendance":"COPY_ATTENDANCE","apply-attendance":"APPLY_ATTENDANCE","clear-attendance":"CLEAR_ATTENDANCE"}[action]}));
+        }
+        else if (action === "export-presets") {
+          const { backup } = await request({ type: "EXPORT_PRESETS" });
+          const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
+          const link = document.createElement("a");
+          link.href = url; link.download = "jain-erp-assist-presets.json";
+          container.appendChild(link); link.click(); link.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          removed = null; error = ""; notice = "Presets exported.";
         }
         else if (action === "open-page") await request({ type: "OPEN_PAGE" });
         else if (action === "review-settings") { container.querySelector(".cf-body").scrollTop = 0; container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true }); }

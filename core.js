@@ -109,7 +109,32 @@
     return JSON.stringify([snapshot.origin, snapshot.account, settings.dateMode,
       settings.classType, settings.dateMode === "previous" ? toSiteDate(settings.previousDate) : "current", fieldKey, context]);
   }
-  const api = { FIELDS, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };
+  function createPresetBackup(presets) {
+    return { format: "jain-erp-assist-presets", version: 1, presets: presets.map(preset => {
+      const clean = cleanPreset(preset);
+      return { name: clean.name, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
+    }) };
+  }
+  function parsePresetBackup(text) {
+    if (typeof text !== "string" || new TextEncoder().encode(text).length > 1024 * 1024) throw new Error("Choose a preset backup smaller than 1 MB.");
+    let backup;
+    try { backup = JSON.parse(text); } catch { throw new Error("This file is not valid JSON. Choose a preset backup exported by Jain ERP Assist."); }
+    if (backup?.format !== "jain-erp-assist-presets" || backup.version !== 1 || !Array.isArray(backup.presets)) throw new Error("This is not a supported Jain ERP Assist preset backup.");
+    if (backup.presets.length > 200) throw new Error("Import at most 200 presets in one backup.");
+    return backup.presets.map((preset, index) => {
+      if (!preset || typeof preset.name !== "string") throw new Error(`Preset ${index + 1} has no valid name.`);
+      const error = validatePreset(preset);
+      if (error) throw new Error(`Preset ${index + 1}: ${error}`);
+      const clean = cleanPreset(preset);
+      // Portable backups contain class filters only, never identity or attendance data.
+      return { name: clean.name.trim(), classTypeOverride: clean.classTypeOverride, fields: clean.fields };
+    });
+  }
+  function presetFingerprint(preset) {
+    return JSON.stringify([normalize(preset.name), preset.classTypeOverride || null,
+      FIELDS.map(field => (preset.fields[field.key] || []).map(choice => [choice.value, normalize(choice.label)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))]);
+  }
+  const api = { createPresetBackup, parsePresetBackup, presetFingerprint, FIELDS, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };
   root.ClassFlowCore = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

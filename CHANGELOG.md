@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0 - 2026-11-05
+
+- Restore copied attendance in the same editable session as well as other sessions, with existing class/date/identity and roster checks intact.
+- Export portable preset backups and import them without overwriting existing classes; skip exact duplicates and validate files before writing.
+- Backups contain class presets only, excluding student attendance, dates, account identity, and runtime settings.
+
 ## 1.1.9 - 2026-11-05
 
 - Show an explicitly green Ready badge on the attendance page.

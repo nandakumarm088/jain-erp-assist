@@ -241,6 +241,28 @@ async function dispatch(message, sender) {
     await chrome.tabs.create({ url: PAGE });
     return { ok: true };
   }
+  if (message.type === "EXPORT_PRESETS") {
+    const { presets } = await readLocal();
+    return { backup: Core.createPresetBackup(presets) };
+  }
+  if (message.type === "IMPORT_PRESETS") {
+    return serial("presets", async () => {
+      // Validate every entry before writing anything; existing presets are never replaced.
+      const imported = Core.parsePresetBackup(message.text);
+      const { presets } = await readLocal();
+      const seen = new Set(presets.map(Core.presetFingerprint));
+      let added = 0, skipped = 0;
+      for (const preset of imported) {
+        const fingerprint = Core.presetFingerprint(preset);
+        if (seen.has(fingerprint)) { skipped++; continue; }
+        seen.add(fingerprint);
+        presets.push(Core.cleanPreset({ ...preset, id: crypto.randomUUID(), updatedAt: Date.now() }));
+        added++;
+      }
+      if (added) await chrome.storage.local.set({ "classflow.presets": presets });
+      return { added, skipped };
+    });
+  }
   if (message.type === "SAVE_PRESET") {
     return serial("presets", async () => {
       const error = Core.validatePreset(message.preset);

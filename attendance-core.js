@@ -35,13 +35,12 @@
   }
   function plan(copy, snapshot, target = null) {
     try {
-      if (!copy?.students?.length) throw new Error("Copy attendance from the first session before applying it.");
+      if (!copy?.students?.length) throw new Error("Copy attendance before applying it.");
       const scope=context(snapshot), students=roster(snapshot);
       for (const key of ["origin","account","date","classType"]) {
         if (scope[key] !== copy.scope[key]) throw new Error(`Copied attendance belongs to a different ${key === "account" ? "logged-in user" : key === "classType" ? "Theory/Lab class" : key}. Nothing was changed.`);
       }
       for (const key of keys) if (JSON.stringify(scope.fields[key]) !== JSON.stringify(copy.scope.fields[key])) throw new Error(`The ${key} differs from the copied class. Nothing was changed.`);
-      if (JSON.stringify(scope.fields.session) === JSON.stringify(copy.scope.fields.session)) throw new Error("Select a different session on the website, then apply the copied attendance.");
       if (target && (["origin","account","date","classType"].some(key=>scope[key]!==target[key]) || [...keys,"session"].some(key=>JSON.stringify(scope.fields[key])!==JSON.stringify(target.fields[key])))) throw new Error("The class or target session changed during copying. Stopped; review the page.");
       if (snapshot.alreadyRecorded) throw new Error("Attendance is already recorded for this session. Nothing was changed.");
       if (students.some(student=>student.disabled)) throw new Error("The student list is not editable. Nothing was changed.");

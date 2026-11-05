@@ -109,7 +109,7 @@ Attendance copying is available in **v1.1.0**, using **Student USN as the primar
 
 The copy is kept locally across reloads, panel closure, and browser restarts until replaced with **Copy again** or removed with **Clear**. It is separate from presets. Clear does not change selections on the website.
 
-Apply requires the same lecturer, date, program, batch, semester, specialization, course, Theory/Lab mode, and sections, with a different session. Missing/extra students, duplicate/missing IDs, registration mismatches, paginated lists, disabled checkboxes, or already-recorded target attendance block application. **Stop** or manual changes stop further work; any selections already applied remain for review. No Save, Edit, Cancel, or master checkbox is clicked by the extension. No page monitoring runs while idle.
+Apply requires the same lecturer, date, program, batch, semester, specialization, course, Theory/Lab mode, and sections, with the same or a different session. Missing/extra students, duplicate/missing IDs, registration mismatches, paginated lists, disabled checkboxes, or already-recorded target attendance block application. **Stop** or manual changes stop further work; any selections already applied remain for review. No Save, Edit, Cancel, or master checkbox is clicked by the extension. No page monitoring runs while idle.
 
 Run `node tests/attendance-browser.cjs` for the local synthetic full/partial-postback attendance checks. `npm.cmd test` includes identity and context unit tests. Tests do not contact the real ERP or submit live attendance.
 
@@ -120,3 +120,9 @@ Tested the authenticated page at Previous Date **02/10/2026**, Theory, BCAN Hono
 The actual v1.1.3 Copy/Apply flow copied two absences from session 1 to session 2 and restored an extra accidental untick to present: 73 checked, 2 unchecked after the server response. All 75 starting checks, session 1, the original copied attendance, and normal Chrome were restored afterward. A request guard blocked Save operations throughout; no Save request was issued. This verifies checkbox registration through postbacks, **not final attendance persistence after Save**.
 
 The project root is `E:\Personal_Projects\Jain ERP Assist`. A compatibility junction at the former `ERP_Filter_Extension` path points to this folder so existing Chrome unpacked-extension registrations, extension IDs, stored presets, and the dedicated profile path remain valid. Open the new folder in your IDE; the compatibility link contains no separate project copy.
+
+## Preset backups
+
+Use **Export** below Saved classes to download `jain-erp-assist-presets.json`. Use **Import** there to add presets from that backup. Existing classes are retained; exact duplicates are skipped. All entries are validated before any changes are written. Backups include names, saved filters, optional session choices, and optional Theory/Lab overrides, but no lecturer identity, copied student attendance, dates, or runtime settings. Imported options are still checked against the live website when applied.
+
+Copied attendance can also be applied back to the **same editable session** to restore accidental changes. Already-recorded/disabled attendance and different classes, dates, users, or rosters remain protected. Save is always manual.

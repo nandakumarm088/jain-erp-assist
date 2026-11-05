@@ -162,3 +162,24 @@ test('website dropdown messages are shown verbatim instead of a missing preset o
   delete snapshot.fields.course.siteMessage;
   assert.equal(Core.plan(preset,snapshot).type,'wait');
 });
+
+test('preset backups round-trip filters and overrides without dates, account, or attendance',()=>{
+ const {preset}=example();preset.scope={origin:'https://erp.test',account:'private-lecturer'};
+ preset.classTypeOverride='lab';preset.date='02/10/2026';preset.students=[{usn:'PRIVATE'}];
+ const backup=Core.createPresetBackup([preset]);
+ assert.equal(backup.format,'jain-erp-assist-presets');
+ assert.equal(JSON.stringify(backup).includes('private-lecturer'),false);
+ assert.equal(JSON.stringify(backup).includes('PRIVATE'),false);
+ assert.equal(backup.presets[0].date,undefined);
+ const [restored]=Core.parsePresetBackup(JSON.stringify(backup));
+ assert.deepEqual(restored.fields,preset.fields);assert.equal(restored.classTypeOverride,'lab');
+ assert.equal(Core.presetFingerprint(restored),Core.presetFingerprint(preset));
+});
+test('preset imports reject malformed or invalid files before merging',()=>{
+ assert.throws(()=>Core.parsePresetBackup('not JSON'),/valid JSON/);
+ assert.throws(()=>Core.parsePresetBackup('{"presets":[]}'),/supported/);
+ const {preset}=example();const backup=Core.createPresetBackup([preset]);backup.presets.push({name:'Broken',fields:{}});
+ assert.throws(()=>Core.parsePresetBackup(JSON.stringify(backup)),/Preset 2/);
+ backup.presets=[{name:3,fields:{}}];assert.throws(()=>Core.parsePresetBackup(JSON.stringify(backup)),/valid name/);
+ assert.throws(()=>Core.parsePresetBackup('x'.repeat(1024*1024+1)),/1 MB/);
+});
