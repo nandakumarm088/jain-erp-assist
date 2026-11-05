@@ -3,9 +3,17 @@
   // Pin this panel instance to its opening tab, independent of later focus changes.
   let tabId;
   try {
-    const window = await chrome.windows.getCurrent();
-    const [tab] = await chrome.tabs.query({ active: true, windowId: window.id });
-    const initial = await chrome.runtime.sendMessage({ type: "PANEL_OPEN", tabId: tab?.id });
+    const linkedId = new URLSearchParams(location.search).get("tabId");
+    let openingTabId;
+    if (linkedId !== null) {
+      if (!/^\d+$/.test(linkedId)) throw new Error("Invalid linked tab. Reopen the extension.");
+      openingTabId = Number(linkedId);
+    } else {
+      const window = await chrome.windows.getCurrent();
+      const [tab] = await chrome.tabs.query({ active: true, windowId: window.id });
+      openingTabId = tab?.id;
+    }
+    const initial = await chrome.runtime.sendMessage({ type: "PANEL_OPEN", tabId: openingTabId });
     if (initial?.error) throw new Error(initial.error);
     if (!Number.isInteger(initial?.tabId)) throw new Error("The opening tab is unavailable. Reopen the extension on the attendance tab.");
     tabId = initial.tabId;

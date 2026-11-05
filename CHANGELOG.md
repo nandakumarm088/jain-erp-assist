@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.3 - 2026-11-05
+
+- Open a tab-specific panel instead of a global panel so Chrome hides it on unrelated tabs.
+- Encode the linked tab in the panel URL to preserve its target across panel reloads.
+
 ## 1.5.2 - 2026-11-05
 
 - Keep each open panel bound to its opening tab when other tabs or windows gain focus.

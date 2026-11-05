@@ -20,18 +20,50 @@ let context;
   const tabId=await worker.evaluate(async()=>(await chrome.tabs.query({})).find(tab=>tab.url?.includes('JVPL_Regular_Class_Attendance'))?.id);
   const seed=async data=>{await site.evaluate(data=>{sessionStorage.setItem('fixture',JSON.stringify(data));sessionStorage.removeItem('history');},data);await site.reload();};
   await seed(complete);
+  const defaultOptions=await worker.evaluate(()=>chrome.sidePanel.getOptions({}));
+  assert.equal(defaultOptions.enabled,false,'global panel is disabled');
+  await worker.evaluate(async tabId=>{
+    const original=chrome.sidePanel.open;
+    chrome.sidePanel.open=async options=>{globalThis.openedPanel=options;};
+    try { await openPanelForTab({id:tabId}); } finally { chrome.sidePanel.open=original; }
+  },tabId);
+  const linkedOptions=await worker.evaluate(tabId=>chrome.sidePanel.getOptions({tabId}),tabId);
+  assert.equal(linkedOptions.enabled,true);
+  assert.equal(linkedOptions.path,'sidepanel.html?tabId='+tabId);
+  assert.deepEqual(await worker.evaluate(()=>globalThis.openedPanel),{tabId});
   const panel=await context.newPage();
   await panel.addInitScript(tabId=>{
     window.openingTarget=tabId;window.sentTargets=[];
     const send=chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage=message=>{
-      if(message.type==='PANEL_OPEN')return send({...message,tabId});
+      if(message.type==='PANEL_OPEN'){window.initialTarget=message.tabId;return send(message);}
       window.sentTargets.push(message.tabId);return send(message);
     };
   },tabId);
-  await panel.goto(`chrome-extension://${new URL(worker.url()).host}/sidepanel.html`);await panel.setViewportSize({width:360,height:900});
+  await panel.goto(`chrome-extension://${new URL(worker.url()).host}/sidepanel.html?tabId=${tabId}`);await panel.setViewportSize({width:360,height:900});
   await panel.locator('.is-connected').waitFor();
+  // Exercise first opening from a disabled tab with the real native API.
+  await worker.evaluate(tabId=>chrome.sidePanel.setOptions({tabId,enabled:false}),tabId);
+  await worker.evaluate(()=>{
+    const original=dispatch;
+    dispatch=async(message,sender)=>message.type==='TEST_OPEN_PANEL'
+      ? openPanelForTab({id:message.tabId}).then(()=>({ok:true}))
+      : original(message,sender);
+  });
+  await panel.evaluate(tabId=>{
+    const button=document.createElement('button');button.id='test-open-panel';button.textContent='Test native open';
+    button.onclick=async()=>{window.nativeOpenResult=await chrome.runtime.sendMessage({type:'TEST_OPEN_PANEL',tabId});};
+    document.body.append(button);
+  },tabId);
+  await panel.locator('#test-open-panel').click();
+  await panel.waitForFunction(()=>window.nativeOpenResult);
+  assert.deepEqual(await panel.evaluate(()=>window.nativeOpenResult),{ok:true},'trusted click can open the tab-specific panel');
+  await panel.locator('#test-open-panel').evaluate(el=>el.remove());
+
+  assert.equal(await panel.evaluate(()=>window.initialTarget),tabId,'panel URL determines its target');
   const other=await context.newPage();await other.goto('about:blank');await other.bringToFront();
+  const otherTabId=await worker.evaluate(async()=> (await chrome.tabs.query({active:true,currentWindow:true}))[0].id);
+  assert.equal((await worker.evaluate(tabId=>chrome.sidePanel.getOptions({tabId}),otherTabId)).enabled,false,'unrelated tab has no enabled panel');
   await panel.getByRole('button',{name:'Lab',exact:true}).click();
   const settings=await worker.evaluate(async tabId=>(await chrome.storage.session.get('classflow.settings.'+tabId))['classflow.settings.'+tabId],tabId);
   assert.equal(settings.classType,'lab','settings still target opening tab');

@@ -23,7 +23,23 @@ const storageReady = (async () => {
   await chrome.storage.session.set(strip(await chrome.storage.session.get(null)));
   await chrome.storage.local.set({ ...updates, "classflow.cache": {}, "classflow.freeAttendanceType": true });
 })();
-chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(console.error);
+// A global panel follows the user between tabs. Keep it disabled and open only
+// a tab-specific panel after an explicit toolbar click.
+const panelReady = Promise.all([
+  chrome.sidePanel.setOptions({ enabled: false }),
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false })
+]);
+panelReady.catch(console.error);
+async function openPanelForTab(tab) {
+  if (!Number.isInteger(tab?.id)) return;
+  // Issue both calls during the click handler: awaiting configuration first
+  // loses Chrome's user gesture before open(). Chrome processes them in order.
+  await Promise.all([
+    chrome.sidePanel.setOptions({ tabId: tab.id, path: `sidepanel.html?tabId=${tab.id}`, enabled: true }),
+    chrome.sidePanel.open({ tabId: tab.id })
+  ]);
+}
+chrome.action.onClicked.addListener(tab => { openPanelForTab(tab).catch(console.error); });
 const isPage = url => {
   try { const parsed = new URL(url); return parsed.origin === SITE && /\/JVPL_Regular_Class_Attendance\.aspx$/i.test(parsed.pathname); }
   catch { return false; }
