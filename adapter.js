@@ -1,7 +1,7 @@
 /* Runs in the page's MAIN world, so ASP.NET and Chosen receive real change events. */
 (() => {
   "use strict";
-  if (window.__classFlowAdapter?.version === 4) return;
+  if (window.__classFlowAdapter?.version === 5) return;
   const pageId = crypto.randomUUID();
   let revision = 0;
   let requestBusy = false;
@@ -9,18 +9,21 @@
   let managerRef = null;
   let manualCancelled = false;
   let lastSnapshot = null;
-  const ids = {
+  const regularIds = {
     program: "Body_ddlGraduationType",
     batch: "Body_ddlAcademicBatch", semester: "Body_ddlcourseyearsem",
     specialization: "Body_ddlBranch", course: "Body_ddlsubject",
     section: "Body_ChklstSection", session: "Body_ddlperiod"
   };
+  const remedialIds = { attendanceType: "Body_dwdlAttendanceType", specialization: "Body_ddlBranchRemidial", course: "Body_ddlsubject", section: "Body_lstBxSection", period: "Body_ddlperiod" };
   const radioIds = { current: "Body_rdCurrentDate", previous: "Body_rdNextDate", theory: "Body_rdTheory", lab: "Body_rdLab" };
+  const pageType = () => /JVPL_Remedial_Class_Attendance\.aspx$/i.test(location.pathname) ? "remedial" : /JVPL_Regular_Class_Attendance\.aspx$/i.test(location.pathname) ? "regular" : "table";
+  const activeIds = () => pageType() === "remedial" ? remedialIds : regularIds;
   const byId = id => document.getElementById(id) || document.querySelector(`[id$="_${id.replace(/^Body_/, "")}"]`);
   const clean = text => String(text || "").replace(/\s+/g, " ").trim();
   const placeholder = o => !o.value || o.value === "0" || /^(?:-+\s*)?select(?:\s+an?\s+option)?(?:\s*-+)?$/i.test(o.label);
   const hasPostback = element => /__doPostBack|WebForm_DoPostBackWithOptions/i.test(`${element?.getAttribute("onchange")} ${element?.getAttribute("onclick")}`);
-  const dateInput = () => byId("Body_txtdDAad");
+  const dateInput = () => byId("Body_txtdDAad") || (pageType() === "remedial" ? document.querySelector('input[type="text"][id*="txtxFromDate"]') : null);
   const getManager = () => window.Sys?.WebForms?.PageRequestManager?.getInstance?.();
   const beginRequest = () => { requestBusy = true; };
   const endRequest = () => { requestBusy = false; revision++; };
@@ -34,10 +37,10 @@
     managerRef = manager;
     return manager;
   }
-  const nativeSelector = Object.values(ids).concat(Object.values(radioIds), ["Body_txtdDAad"]).map(id => `#${id}`).join(",");
+  const nativeSelector = Object.values({...regularIds, ...remedialIds}).concat(Object.values(radioIds), ["Body_txtdDAad"]).map(id => `#${id}`).join(",");
   const manual = event => {
     const target = event.target;
-    if (event.isTrusted && target instanceof Element && (target.matches(nativeSelector)
+    if (event.isTrusted && target instanceof Element && (target.matches(nativeSelector) || (pageType() === "remedial" && target.matches('input[type="text"][id*="txtxFromDate"]'))
       || target.closest("label")?.control?.matches(nativeSelector)
       || target.closest(".chzn-container,.chosen-container,.multiselect-native-select,#Body_ChklstSection,[id$=\"_gdvStudents\"]"))) manualCancelled = true;
   };
@@ -74,7 +77,7 @@
     }));
   }
   function fieldState(key) {
-    const element = byId(ids[key]);
+    const element = byId(activeIds()[key]);
     if (!element) return { found: false, options: [], selected: [], disabled: false };
     const all = element.tagName === "SELECT" ? [...element.options].map(option => ({
       value: option.value, label: clean(option.textContent), selected: option.selected, disabled: option.disabled
@@ -91,15 +94,17 @@
     const busy = document.readyState === "loading" || requestBusy || Boolean(manager?.get_isInAsyncPostBack?.());
     if (busy && lastSnapshot) return { ...lastSnapshot, busy: true, readAt: Date.now() };
     const input = dateInput();
+    const ids = activeIds();
     const fields = Object.fromEntries(Object.keys(ids).map(key => [key, fieldState(key)]));
     const dateMode = byId(radioIds.previous)?.checked ? "previous" : byId(radioIds.current)?.checked ? "current" : "";
-    const classType = byId(radioIds.lab)?.checked ? "lab" : byId(radioIds.theory)?.checked ? "theory" : "";
+    const classType = pageType() === "regular" ? (byId(radioIds.lab)?.checked ? "lab" : byId(radioIds.theory)?.checked ? "theory" : "") : "";
     const account = clean(byId("Body_lbllecturer")?.textContent || byId("Body_lblFaculty")?.textContent || byId("Body_lblLecturer")?.textContent ||
       [...document.querySelectorAll("span.label, span.badge")].find(element => /@/.test(element.textContent))?.textContent || "current-lecturer");
     const alerts = [...document.querySelectorAll('.alert, [role="alert"], #Body_lblmsg, #Body_lblMessage')]
       .map(element => clean(element.textContent)).filter(text => /already.*(?:attendance|entered)|attendance.*already/i.test(text));
-    lastSnapshot = { attendancePage: /JVPL_Regular_Class_Attendance\.aspx$/i.test(location.pathname) && fields.program.found,
-      origin: location.origin, account, pageId, revision,
+    const tablePage = Boolean(byId("Body_gdvStudents"));
+    lastSnapshot = { attendancePage: /JVPL_(?:Regular|Remedial)_Class_Attendance\.aspx$/i.test(location.pathname) && (pageType() === "remedial" ? fields.attendanceType.found : fields.program.found),
+      tablePage, pagePath: location.pathname, pageType: pageType(), origin: location.origin, account, pageId, revision,
       busy,
       dateMode, classType, date: clean(input?.value || byId("Body_lbldate")?.textContent), hasDateInput: !!input,
       radios: Object.fromEntries(Object.entries(radioIds).map(([key, id]) => [key, !!byId(id)])),
@@ -132,6 +137,21 @@
     const {students,rosterError}=studentRows();
     return {...snapshot,rosterError,students:students.map(({element,...student})=>student)};
   }
+  function studentListRead() { return attendanceRead(); }
+  function studentListAct({ usn, present }) {
+    if (!active || manualCancelled) throw new Error("Student-list application stopped. Try again when the page is ready.");
+    const current = attendanceRead();
+    if (current.manualCancelled || current.busy) throw new Error("Wait for the student table to finish refreshing.");
+    const rows = studentRows().students;
+    const row = rows.find(student => student.usn.toUpperCase() === String(usn || "").trim().toUpperCase());
+    if (!row) throw new Error(`Student USN ${usn} is no longer in the table.`);
+    if (row.element.disabled) throw new Error(`Student ${row.usn} cannot be changed because its checkbox is disabled.`);
+    if (row.present === Boolean(present)) return { posted:false };
+    const posted = hasPostback(row.element);
+    row.element.addEventListener("click", event => event.stopPropagation(), { once:true });
+    row.element.click();
+    return { posted };
+  }
   function attendanceAct({copy,target}) {
     if (!active || manualCancelled) throw new Error("Attendance application stopped. Try again when the page is ready.");
     const next=window.ClassFlowAttendance.plan(copy,attendanceRead(),target);
@@ -162,19 +182,43 @@
       try {
       // Both plugin names are used by different releases of Chosen.
       window.jQuery(element).trigger("chosen:updated").trigger("liszt:updated");
-      if (element.id === ids.section && window.jQuery.fn?.multiselect) {
+      if (element.id === activeIds().section && window.jQuery.fn?.multiselect) {
         try { window.jQuery(element).multiselect("refresh"); } catch { /* not initialized */ }
       }
       } catch { /* A stale jQuery plugin must not block the native change. */ }
     }
     return { posted };
   }
+  function setMultiple(element, values) {
+    const desired = new Set(values);
+    const inlineChange = element.getAttribute("onchange");
+    const wrapper = element.closest(".multiselect-native-select");
+    try {
+      // bootstrap-multiselect owns the visible checkboxes. Drive those inputs
+      // with the page callback temporarily disabled, then post the final set.
+      if (wrapper) {
+        const toggle = wrapper.querySelector("button.multiselect.dropdown-toggle");
+        if (toggle && toggle.getAttribute("aria-expanded") !== "true") toggle.click();
+        element.removeAttribute("onchange");
+      }
+      for (const option of element.options) {
+        const checkbox = wrapper?.querySelector(`input[type="checkbox"][value="${CSS.escape(option.value)}"]`);
+        const selected = desired.has(option.value);
+        if (checkbox && checkbox.checked !== selected) checkbox.click();
+        else option.selected = selected;
+      }
+    } finally {
+      if (inlineChange !== null) element.setAttribute("onchange", inlineChange);
+    }
+    return change(element);
+  }
   function act(action) {
     if (manualCancelled) throw new Error("Manual filter input stopped this run.");
     if (!active) throw new Error("Start filter application first.");
-    if (!read().attendancePage) throw new Error("Open Regular Class Attendance first.");
+    if (!read().attendancePage) throw new Error("Open a Jain ERP attendance page first.");
     if (action.field === "dateMode" || action.field === "classType") {
       const allowed = action.field === "dateMode" ? ["current", "previous"] : ["theory", "lab"];
+      if (action.field === "classType" && pageType() === "remedial") throw new Error("Remedial attendance does not use Theory or Lab.");
       if (!allowed.includes(action.value)) throw new Error("Unsupported radio selection.");
       const radio = byId(radioIds[action.value]);
       if (!radio || radio.disabled) throw new Error("This radio option is unavailable.");
@@ -188,6 +232,16 @@
       element.value = action.value;
       return change(element);
     }
+    const ids = activeIds();
+    if (["sectionClear", "sectionSelect"].includes(action.field)) {
+      if (pageType() !== "remedial") throw new Error("Section refresh is available on the remedial attendance page only.");
+      const values = action.field === "sectionClear" ? [] : action.values;
+      if (!Array.isArray(values) || (action.field === "sectionSelect" && !values.length)) throw new Error("The remedial Section selection could not be updated.");
+      const element = byId(remedialIds.section);
+      const live = fieldState("section");
+      if (!element || element.disabled || values.some(value => !live.options.some(option => option.value === value && !option.disabled))) throw new Error("The remedial Section options changed before Period No could be populated.");
+      return setMultiple(element, values);
+    }
     if (!Object.hasOwn(ids, action.field) || !Array.isArray(action.values)) throw new Error("Unsupported field.");
     const element = byId(ids[action.field]);
     const live = fieldState(action.field);
@@ -196,6 +250,7 @@
     }
     if (element.tagName === "SELECT") {
       if (!element.multiple && action.values.length !== 1) throw new Error("Choose exactly one option.");
+      if (pageType() === "remedial" && action.field === "section") return setMultiple(element, action.values);
       for (const option of element.options) option.selected = action.values.includes(option.value);
       return change(element);
     }
@@ -207,5 +262,5 @@
     item.element.click();
     return { posted };
   }
-  window.__classFlowAdapter = { version: 4, read, act, attendanceRead, attendanceAct, start, stop };
+  window.__classFlowAdapter = { version: 5, read, act, attendanceRead, attendanceAct, studentListRead, studentListAct, start, stop };
 })();

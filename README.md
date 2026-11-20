@@ -2,7 +2,7 @@
 
 An independent tool by NK Developers; not an official Jain extension.
 
-A new Manifest V3 extension for Jain's **Regular Class Attendance** page. Save a class's filters once and apply the entire sequence with one click.
+A Manifest V3 extension for Jain ERP **Regular and Remedial Class Attendance** pages. Save class filters once and apply them with one click; copy attendance between sessions or mark students from a pasted USN list.
 
 ## Load the new version
 
@@ -96,13 +96,13 @@ Each fresh side-panel opening starts on Current Date and Theory. This only reset
 
 ## Versions
 
-The completed filter flow is **v1.0.0**, the baseline before attendance copying. The panel displays the installed manifest version beside Jain ERP Assist. Keep manifest.json, package.json, and package-lock.json versions in sync. Use patch versions for fixes, minor versions for new compatible features, and major versions for breaking changes. Record releases in CHANGELOG.md and tag release commits in Git.
+The current release is **v1.5.6**. The original filter flow baseline was v1.0.0. The panel displays the installed manifest version beside Jain ERP Assist. Keep manifest.json, package.json, and package-lock.json versions in sync. Use patch versions for fixes, minor versions for new compatible features, and major versions for breaking changes. Record releases in CHANGELOG.md and tag release commits in Git.
 
 Attendance copying is available in **v1.1.0**, using **Student USN as the primary ID** and **Registration No as the secondary check**.
 
 ## Copy attendance to another session
 
-1. Mark the first session on the website, then click **Copy attendance** in the panel **before saving**. The summary shows the source session/date and present/absent counts.
+1. Mark the first session on the website, then click **Copy attendance** in the panel **before saving**. The summary shows the source section, session/period, date, and present/absent counts.
 2. Use the website's **Save**, then select the other session and wait for its student list.
 3. Click **Apply to this session**. The extension matches the full roster by USN, cross-checks registration numbers, and restores both checked and unchecked states. It waits through each required checkbox postback and verifies all states afterward.
 4. Review the list, make any needed changes, and click the website's **Save** yourself.
@@ -121,6 +121,12 @@ The actual v1.1.3 Copy/Apply flow copied two absences from session 1 to session 
 
 The project root is `E:\Personal_Projects\Jain ERP Assist`. A compatibility junction at the former `ERP_Filter_Extension` path points to this folder so existing Chrome unpacked-extension registrations, extension IDs, stored presets, and the dedicated profile path remain valid. Open the new folder in your IDE; the compatibility link contains no separate project copy.
 
+## Remedial attendance and pasted USNs
+
+The saved preset library also supports the **Remedial Class Attendance** page. Remedial presets save Attendance Type, Specialization, Course, and Section; Period No remains a manual choice. Presets are tagged Regular or Remedial and only apply on their matching page.
+
+Expand **Paste Student USNs** in the Attendance card to mark listed students Present or Absent. Matching uses USN and checks Registration No; unlisted students keep their current state. Review the resulting attendance and click Save on the website yourself.
+
 ## Preset backups
 
 Use **Export** below Saved classes to download `jain-erp-assist-presets.json`. Use **Import** there to add presets from that backup. Existing classes are retained; exact duplicates are skipped. All entries are validated before any changes are written. Backups include names, saved filters, optional session choices, and optional Theory/Lab overrides, but no lecturer identity, copied student attendance, dates, or runtime settings. Imported options are still checked against the live website when applied.
@@ -133,7 +139,7 @@ Feedback appears beneath its originating section: attendance Copy/Apply under At
 
 ## Saved class categories
 
-In the preset editor, **Category** is optional: choose a saved name from the dropdown directly above Class type. Use **+ Category** under Saved classes or the plus button beside the dropdown to create a category first. Presets with the same category appear in a collapsible group under Saved classes; uncategorized presets appear together below those groups. Expansion/collapse is remembered between panel/browser openings. With no categories, the original flat class list is retained. Search includes category names and temporarily expands matching groups. Drag or Alt+Up/Down reorders classes within a category; edit Category to move a class into another group or clear it to remove grouping. Export/Import preserves category assignments; older presets/backups remain uncategorized.
+In the preset editor, **Category** is optional: choose a saved name from the dropdown directly above Class type. Use **+ Category** under Saved classes or the plus button beside the dropdown to create a category first. Presets with the same category appear in a collapsible group under Saved classes; uncategorized presets appear together below those groups. Expansion/collapse is remembered between panel/browser openings. With no categories, the original flat class list is retained. Search includes category names and temporarily expands matching groups. Drag category groups to change their order, or focus a category heading and press Alt+Up/Down. Uncategorized stays last. Drag or Alt+Up/Down reorders classes within their category; edit Category to move a class into another group or clear it to remove grouping. Export/Import preserves category assignments; older presets/backups remain uncategorized.
 
 Categories are saved independently and can exist without classes. Empty categories remain after the last preset is removed and are included in Export/Import. **Preset removed** and Undo disappear after five seconds.
 

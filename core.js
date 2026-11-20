@@ -1,7 +1,7 @@
 /* Shared, deterministic rules. Cached options are never used by the runner. */
 (function (root) {
   "use strict";
-  const FIELDS = [
+  const REGULAR_FIELDS = [
     { key: "program", label: "Program" },
     { key: "batch", label: "Academic batch" },
     { key: "semester", label: "Course year / semester" },
@@ -10,6 +10,16 @@
     { key: "section", label: "Section", multiple: true },
     { key: "session", label: "Session no.", optional: true }
   ];
+  const REMEDIAL_FIELDS = [
+    { key: "attendanceType", label: "Attendance type" },
+    { key: "specialization", label: "Specialization" },
+    { key: "course", label: "Course" },
+    { key: "section", label: "Section", multiple: true }
+  ];
+  const FIELDS = REGULAR_FIELDS;
+  const PAGE_TYPES = ["regular", "remedial"];
+  const pageTypeOf = value => value === "remedial" ? "remedial" : "regular";
+  const fieldsFor = value => pageTypeOf(typeof value === "string" ? value : value?.pageType) === "remedial" ? REMEDIAL_FIELDS : REGULAR_FIELDS;
   const normalize = text => String(text || "").replace(/\s+/g, " ").trim().toLowerCase();
   const isPlaceholder = option => !option.value || option.value === "0" ||
     /^(?:-+\s*)?select(?:\s+an?\s+option)?(?:\s*-+)?$/i.test(option.label.trim());
@@ -29,8 +39,9 @@
     if (!preset?.name?.trim()) return "Give this class a name.";
     if (preset.category != null && (typeof preset.category !== "string" || preset.category.trim().replace(/\s+/g, " ").length > 50)) return "Use a category name of 50 characters or fewer.";
     if (preset.name.length > 80) return "Use a class name of 80 characters or fewer.";
-    if (preset.classTypeOverride != null && !["theory", "lab"].includes(preset.classTypeOverride)) return "Choose Filters only, Theory, or Lab.";
-    for (const field of FIELDS) {
+    if (pageTypeOf(preset.pageType) === "remedial" && preset.classTypeOverride != null) return "Remedial classes do not use Theory or Lab overrides.";
+    if (pageTypeOf(preset.pageType) === "regular" && preset.classTypeOverride != null && !["theory", "lab"].includes(preset.classTypeOverride)) return "Choose Filters only, Theory, or Lab.";
+    for (const field of fieldsFor(preset)) {
       const choices = preset.fields?.[field.key];
       if (field.optional && (choices == null || (Array.isArray(choices) && !choices.length))) continue;
       if (!Array.isArray(choices) || !choices.length) return `Choose ${field.label.toLowerCase()}.`;
@@ -41,20 +52,21 @@
     return "";
   }
   function cleanPreset(preset) {
-    return { id: preset.id, name: preset.name, schemaVersion: 4,
+    const pageType = pageTypeOf(preset?.pageType);
+    return { id: preset.id, name: preset.name, schemaVersion: 5, pageType,
       category: typeof preset.category === "string" ? preset.category.trim().replace(/\s+/g, " ") : "",
-      classTypeOverride: ["theory", "lab"].includes(preset.classTypeOverride) ? preset.classTypeOverride : null,
-      fields: Object.fromEntries(FIELDS.map(field => [field.key, (preset.fields?.[field.key] || []).map(({ value, label }) => ({ value, label }))])),
+      classTypeOverride: pageType === "regular" && ["theory", "lab"].includes(preset.classTypeOverride) ? preset.classTypeOverride : null,
+      fields: Object.fromEntries([...REGULAR_FIELDS, ...REMEDIAL_FIELDS].map(field => [field.key, (preset.fields?.[field.key] || []).map(({ value, label }) => ({ value, label }))])),
       scope: preset.scope ? { origin: preset.scope.origin, account: preset.scope.account } : undefined,
       updatedAt: preset.updatedAt };
   }
   function runtimeFromSnapshot(snapshot) {
-    return { dateMode: snapshot?.dateMode || "current", classType: snapshot?.classType || "theory",
+    return { pageType: pageTypeOf(snapshot?.pageType), dateMode: snapshot?.dateMode || "current", classType: snapshot?.classType || "theory",
       previousDate: snapshot?.dateMode === "previous" ? toISODate(snapshot.date) : "" };
   }
   function validateSettings(settings, incomplete = false) {
     if (!["current", "previous"].includes(settings?.dateMode)) return "Choose Current Date or Previous Date.";
-    if (!["theory", "lab"].includes(settings.classType)) return "Choose Theory or Lab.";
+    if (pageTypeOf(settings?.pageType) === "regular" && !["theory", "lab"].includes(settings.classType)) return "Choose Theory or Lab.";
     if (!incomplete && settings.dateMode === "previous" && !validISODate(settings.previousDate)) return "Choose a valid previous date before applying a class.";
     return "";
   }
@@ -73,42 +85,65 @@
     return { values: resolved };
   }
   const sameValues = (a, b) => a.length === b.length && [...a].sort().every((v, i) => v === [...b].sort()[i]);
-  const settingsForPreset = (preset, settings) => ({ dateMode: settings.dateMode, previousDate: settings.previousDate || "", classType: preset.classTypeOverride || settings.classType });
-  function plan(preset, snapshot, settings = runtimeFromSnapshot(snapshot)) {
+  const settingsForPreset = (preset, settings) => ({ pageType: pageTypeOf(preset?.pageType), dateMode: settings.dateMode, previousDate: settings.previousDate || "", classType: preset.classTypeOverride || settings.classType });
+  function plan(preset, snapshot, settings = runtimeFromSnapshot(snapshot), progress = {}) {
     settings = settingsForPreset(preset, settings);
+    const fields = fieldsFor(preset);
     if (!snapshot?.attendancePage) return { type: "wait", field: "page", label: "Attendance page" };
     if (snapshot.busy) return { type: "wait", field: "page", label: "Website refresh" };
-    const radios = [["dateMode", settings.dateMode, "Date mode"], ["classType", settings.classType, "Theory / Lab"]];
+    const radios = [["dateMode", settings.dateMode, "Date mode"]];
+    if (settings.pageType === "regular") radios.push(["classType", settings.classType, "Theory / Lab"]);
     for (let i = 0; i < radios.length; i++) {
       const [key, value, label] = radios[i];
       if (snapshot[key] !== value) return { type: snapshot.radios?.[value] ? "act" : "wait", field: key, value, label, index: i };
     }
-    if (settings.dateMode === "previous" && snapshot.date !== toSiteDate(settings.previousDate)) {
+    if (settings.pageType === "regular" && settings.dateMode === "previous" && snapshot.date !== toSiteDate(settings.previousDate)) {
       return { type: snapshot.hasDateInput ? "act" : "wait", field: "date", value: toSiteDate(settings.previousDate), label: "Previous date", index: 2 };
     }
-    for (let i = 0; i < FIELDS.length; i++) {
-      const field = FIELDS[i];
+    for (let i = 0; i < fields.length; i++) {
+      const field = fields[i];
       if (field.optional && !preset.fields[field.key]?.length) continue;
       const live = snapshot.fields[field.key];
       if (live?.siteMessage) return { type: "error", field: field.key, label: field.label, message: `${field.label}: ${live.siteMessage}`, websiteMessage: true, index: i + 4 };
-      if (!live?.options?.length) return { type: "wait", field: field.key, label: field.label, index: i + 4 };
+      if (!live?.options?.length) return { type: "wait", field: field.key, label: field.label, index: i + 2 };
       const match = resolveChoices(preset.fields[field.key], live.options);
-      if (match.error) return { type: "error", field: field.key, label: field.label, message: `Saved ${field.label.toLowerCase()}: ${match.error} Edit this class to update it.`, index: i + 4 };
+      if (match.error) return { type: "error", field: field.key, label: field.label, message: `Saved ${field.label.toLowerCase()}: ${match.error} Edit this class to update it.`, index: i + 2 };
+      if (settings.pageType === "remedial" && field.key === "section") {
+        const selected = live.selected.map(option => option.value);
+        if (!["cleared", "selected"].includes(progress.sectionPhase) && (!sameValues(match.values, selected) || !snapshot.fields.period?.options?.length)) {
+          return { type: "act", field: "sectionClear", values: [], label: "Section", index: i + 2 };
+        }
+        if (progress.sectionPhase === "cleared" && !sameValues(match.values, selected)) {
+          return { type: "act", field: "sectionSelect", values: match.values, label: "Section", index: i + 2 };
+        }
+      }
       if (!sameValues(match.values, live.selected.map(option => option.value))) {
-        return { type: live.disabled ? "wait" : "act", field: field.key, values: match.values, label: field.label, index: i + 4 };
+        return { type: live.disabled ? "wait" : "act", field: field.key, values: match.values, label: field.label, index: i + 2 };
+      }
+      // The remedial page must receive Attendance Type before its date picker
+      // is changed; selecting the date first clears or delays its options.
+      if (settings.pageType === "remedial" && field.key === "attendanceType" && settings.dateMode === "previous" && snapshot.date !== toSiteDate(settings.previousDate)) {
+        return { type: snapshot.hasDateInput ? "act" : "wait", field: "date", value: toSiteDate(settings.previousDate), label: "Previous date", index: i + 3 };
       }
     }
-    return { type: "done", index: 11, label: "Class ready" };
+    // Remedial attendance auto-selects Section while loading, but the site only
+    // populates Period No after Section emits a fresh change/postback.
+    if (settings.pageType === "remedial" && snapshot.fields.period && !snapshot.fields.period.options.length) {
+      if (progress.sectionPhase === "cleared") return { type: "act", field: "sectionSelect", values: preset.fields.section.map(option => option.value), label: "Section", index: fields.length + 2 };
+      if (progress.sectionPhase === "selected") return { type: "wait", field: "period", label: "Period No", index: fields.length + 3 };
+    }
+    return { type: "done", index: fields.length + 2, label: "Class ready" };
   }
   // Full parent context, including mode and lecturer, prevents cross-class cache collisions.
   function cacheKey(snapshot, fieldKey, draft = null, settings = runtimeFromSnapshot(snapshot)) {
-    const index = FIELDS.findIndex(field => field.key === fieldKey);
+    const activeFields = fieldsFor(snapshot);
+    const index = activeFields.findIndex(field => field.key === fieldKey);
     const fields = draft?.fields || snapshot.fields;
-    const context = FIELDS.slice(0, index).map(field => {
+    const context = activeFields.slice(0, index).map(field => {
       const values = draft ? (fields[field.key] || []) : (fields[field.key]?.selected || []);
       return values.map(option => option.value).sort();
     });
-    return JSON.stringify([snapshot.origin, snapshot.account, settings.dateMode,
+    return JSON.stringify([snapshot.pageType, snapshot.origin, snapshot.account, settings.dateMode,
       settings.classType, settings.dateMode === "previous" ? toSiteDate(settings.previousDate) : "current", fieldKey, context]);
   }
   function categoryNames(presets, saved = []) {
@@ -121,16 +156,16 @@
     return [...names.values()];
   }
   function createPresetBackup(presets, categories = []) {
-    return { format: "jain-erp-assist-presets", version: 1, categories: categoryNames(presets, categories), presets: presets.map(preset => {
+    return { format: "jain-erp-assist-presets", version: 2, categories: categoryNames(presets, categories), presets: presets.map(preset => {
       const clean = cleanPreset(preset);
-      return { name: clean.name, category: clean.category, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
+      return { name: clean.name, category: clean.category, pageType: clean.pageType, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
     }) };
   }
   function parsePresetBackup(text) {
     if (typeof text !== "string" || new TextEncoder().encode(text).length > 1024 * 1024) throw new Error("Choose a preset backup smaller than 1 MB.");
     let backup;
     try { backup = JSON.parse(text); } catch { throw new Error("This file is not valid JSON. Choose a preset backup exported by Jain ERP Assist."); }
-    if (backup?.format !== "jain-erp-assist-presets" || backup.version !== 1 || !Array.isArray(backup.presets)) throw new Error("This is not a supported Jain ERP Assist preset backup.");
+    if (backup?.format !== "jain-erp-assist-presets" || ![1, 2].includes(backup.version) || !Array.isArray(backup.presets)) throw new Error("This is not a supported Jain ERP Assist preset backup.");
     if (backup.categories != null && (!Array.isArray(backup.categories) || backup.categories.length > 200 || backup.categories.some(name => typeof name !== "string" || !name.trim() || name.trim().replace(/\s+/g, " ").length > 50))) throw new Error("This backup has invalid category names.");
     if (backup.presets.length > 200) throw new Error("Import at most 200 presets in one backup.");
     return backup.presets.map((preset, index) => {
@@ -139,14 +174,14 @@
       if (error) throw new Error(`Preset ${index + 1}: ${error}`);
       const clean = cleanPreset(preset);
       // Portable backups contain class filters only, never identity or attendance data.
-      return { name: clean.name.trim(), category: clean.category, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
+      return { name: clean.name.trim(), category: clean.category, pageType: clean.pageType, classTypeOverride: clean.classTypeOverride, fields: clean.fields };
     });
   }
   function presetFingerprint(preset) {
-    return JSON.stringify([normalize(preset.name), normalize(preset.category), preset.classTypeOverride || null,
-      FIELDS.map(field => (preset.fields[field.key] || []).map(choice => [choice.value, normalize(choice.label)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))]);
+    return JSON.stringify([pageTypeOf(preset.pageType), normalize(preset.name), normalize(preset.category), preset.classTypeOverride || null,
+      fieldsFor(preset).map(field => (preset.fields[field.key] || []).map(choice => [choice.value, normalize(choice.label)]).sort((a,b) => JSON.stringify(a).localeCompare(JSON.stringify(b))))]);
   }
-  const api = { categoryNames, createPresetBackup, parsePresetBackup, presetFingerprint, FIELDS, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };
+  const api = { categoryNames, createPresetBackup, parsePresetBackup, presetFingerprint, FIELDS, REGULAR_FIELDS, REMEDIAL_FIELDS, PAGE_TYPES, fieldsFor, pageTypeOf, normalize, isPlaceholder, validISODate, toSiteDate, toISODate, validatePreset, cleanPreset, runtimeFromSnapshot, validateSettings, settingsForPreset, resolveChoices, sameValues, plan, cacheKey };
   root.ClassFlowCore = api;
   if (typeof module !== "undefined") module.exports = api;
 })(globalThis);

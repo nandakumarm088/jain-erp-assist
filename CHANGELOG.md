@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.5.6 - 2026-11-20
+
+- Automatically dismiss the Run stopped notice after two seconds.
+
+## 1.5.5 - 2026-11-20
+
+- Show the selected section name in copied attendance summaries.
+
+## 1.5.4 - 2026-11-20
+
+- Reorder saved categories by dragging groups or using Alt+Up/Down on a category heading.
+- Keep Uncategorized at the end; category order persists across panel reloads.
+
 ## 1.5.3 - 2026-11-05
 
 - Open a tab-specific panel instead of a global panel so Chrome hides it on unrelated tabs.

@@ -4,6 +4,7 @@ const Attendance = ClassFlowAttendance;
 const Core = ClassFlowCore;
 const SITE = "https://jained.jgianveshana.com";
 const PAGE = `${SITE}/UI/Academics/Class%20Attendance/JVPL_Regular_Class_Attendance.aspx`;
+const REMEDIAL_PAGE = `${SITE}/UI/Academics/Class%20Attendance/JVPL_Remedial_Class_Attendance.aspx`;
 const queues = new Map();
 const cacheSeen = new Map();
 const observations = new Map();
@@ -12,17 +13,7 @@ const timers = new Map();
 const jobKey = tabId => `classflow.job.${tabId}`;
 const observationKey = tabId => `classflow.observation.${tabId}`;
 const settingsKey = tabId => `classflow.settings.${tabId}`;
-// Discard historical attendance-type captures once, including cache keys containing them.
-const storageReady = (async () => {
-  const data = await chrome.storage.local.get(null);
-  if (data["classflow.freeAttendanceType"]) return;
-  const strip = value => Array.isArray(value) ? value.map(strip) : value && typeof value === "object"
-    ? Object.fromEntries(Object.entries(value).filter(([key]) => key !== "attendanceType").map(([key, item]) => [key, strip(item)])) : value;
-  const updates = {};
-  for (const key of ["classflow.presets", "classflow.context"]) if (key in data) updates[key] = strip(data[key]);
-  await chrome.storage.session.set(strip(await chrome.storage.session.get(null)));
-  await chrome.storage.local.set({ ...updates, "classflow.cache": {}, "classflow.freeAttendanceType": true });
-})();
+const storageReady = Promise.resolve();
 // A global panel follows the user between tabs. Keep it disabled and open only
 // a tab-specific panel after an explicit toolbar click.
 const panelReady = Promise.all([
@@ -40,10 +31,18 @@ async function openPanelForTab(tab) {
   ]);
 }
 chrome.action.onClicked.addListener(tab => { openPanelForTab(tab).catch(console.error); });
-const isPage = url => {
-  try { const parsed = new URL(url); return parsed.origin === SITE && /\/JVPL_Regular_Class_Attendance\.aspx$/i.test(parsed.pathname); }
-  catch { return false; }
+const pageTypeForUrl = url => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.origin !== SITE) return null;
+    if (/\/JVPL_Regular_Class_Attendance\.aspx$/i.test(parsed.pathname)) return "regular";
+    if (/\/JVPL_Remedial_Class_Attendance\.aspx$/i.test(parsed.pathname)) return "remedial";
+  } catch { /* Invalid URL. */ }
+  return null;
 };
+const isPage = url => Boolean(pageTypeForUrl(url));
+const isSiteUrl = url => { try { return new URL(url).origin === SITE; } catch { return false; } };
+const pageUrl = pageType => pageType === "remedial" ? REMEDIAL_PAGE : PAGE;
 function serial(key, task) {
   const next = (queues.get(key) || Promise.resolve()).catch(() => {}).then(task);
   queues.set(key, next);
@@ -59,7 +58,7 @@ async function pageCall(tabId, method, argument, active = false) {
     func: (method, argument, active) => {
       if (method === "stop") { window.__classFlowAdapter?.stop?.(); return { ok: true }; }
       const adapter = window.__classFlowAdapter;
-      if (adapter?.version !== 4) return { adapterMissing: true };
+      if (adapter?.version !== 5) return { adapterMissing: true };
       if (active) adapter.start();
       try { return adapter[method](argument); }
       finally { if (!active) adapter.stop(); }
@@ -74,7 +73,7 @@ async function pageCall(tabId, method, argument, active = false) {
 async function collectCache(snapshot) {
   if (!snapshot.attendancePage || snapshot.busy) return;
   const entries = [];
-  const fields = Core.FIELDS;
+  const fields = Core.fieldsFor(snapshot);
   for (let index = 0; index < fields.length; index++) {
     const field = fields[index];
     const live = snapshot.fields[field.key];
@@ -112,7 +111,7 @@ async function fail(tabId, job, message, field = "") {
   return finish(tabId, { ...job, status: "error", message, field, pending: null, updatedAt: Date.now() });
 }
 function snapshotSignature(snapshot) {
-  return JSON.stringify([snapshot.pageId, snapshot.revision, snapshot.dateMode, snapshot.classType, snapshot.date, snapshot.fields, snapshot.students, snapshot.rosterError]);
+    return JSON.stringify([snapshot.pageType, snapshot.pageId, snapshot.revision, snapshot.dateMode, snapshot.classType, snapshot.date, snapshot.fields, snapshot.students, snapshot.rosterError]);
 }
 async function advance(tabId, snapshot, stable) {
   let job = (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)] || null;
@@ -135,7 +134,7 @@ async function advance(tabId, snapshot, stable) {
     const next = Attendance.plan(job.copy, snapshot, job.target);
     if (next.type === "error") return fail(tabId, job, next.message);
     if (next.type === "done") return finish(tabId, { ...job, status:"done", progress:next.total, total:next.total,
-      pending:null, updatedAt:now, message:"Attendance applied. Review the list and Save on the website." });
+      pending:null, updatedAt:now, message:job.changedCount != null ? `Updated ${job.changedCount} listed student${job.changedCount === 1 ? "" : "s"}; ${job.alreadyCount || 0} already matched. Review the list and Save on the website.` : "Attendance applied. Review the list and Save on the website." });
     const attempts={...job.attempts,[next.usn]:(job.attempts[next.usn]||0)+1};
     if (attempts[next.usn]>4) return fail(tabId,job,`Attendance for ${next.usn} did not stay selected. Stopped; review the page.`);
     const pending={at:now,field:next.usn,pageId:snapshot.pageId,revision:snapshot.revision,posted:true};
@@ -149,11 +148,30 @@ async function advance(tabId, snapshot, stable) {
     }
     return (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)];
   }
-  const next = Core.plan(job.preset, snapshot, job.settings || Core.runtimeFromSnapshot(snapshot));
+  if (job.kind === "student-list") {
+    const next = Attendance.planStudentList(job.usns, snapshot, job.present);
+    if (next.type === "error") return fail(tabId, job, next.message);
+    if (next.type === "done") return finish(tabId, { ...job, status:"done", progress:next.total, total:next.total, pending:null, updatedAt:now, message:`Updated ${job.changedCount || 0} listed student${(job.changedCount || 0) === 1 ? "" : "s"}; ${job.alreadyCount || 0} already matched.` });
+    const attempts={...job.attempts,[next.usn]:(job.attempts[next.usn]||0)+1};
+    if(attempts[next.usn]>3) return fail(tabId,job,`Student ${next.usn} did not stay ${next.present ? "present" : "absent"} after the refresh. Review the table.`);
+    const pending={at:now,field:next.usn,pageId:snapshot.pageId,revision:snapshot.revision,posted:true};
+    job={...job,attempts,pending,progress:next.total-next.remaining,total:next.total,updatedAt:now,message:`Updating ${next.total-next.remaining + 1} of ${next.total} listed students...`};
+    await putJob(tabId,job);
+    try {
+      const result=await pageCall(tabId,"studentListAct",{usn:next.usn,present:next.present},true);
+      if(result) await putJob(tabId,{...job,pending:{...pending,posted:result.posted}});
+    } catch(error) {
+      if(!/frame|document|context|navigation|removed|closed|access contents/i.test(error.message)) return fail(tabId,job,error.message);
+    }
+    return (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)];
+  }
+  const next = Core.plan(job.preset, snapshot, job.settings || Core.runtimeFromSnapshot(snapshot), job);
   if (next.type === "error") return fail(tabId, { ...job, websiteMessage: Boolean(next.websiteMessage) }, next.message, next.field);
   if (next.type === "done") {
-    return finish(tabId, { ...job, status: "done", progress: 11, field: "", pending: null,
-      message: !job.preset.fields.session?.length ? "Class filters applied. Choose Session No on the website when needed."
+    const remedial = job.preset.pageType === "remedial";
+    return finish(tabId, { ...job, status: "done", progress: remedial ? 6 : 11, field: "", pending: null,
+      message: remedial ? "Remedial filters applied. Choose Period No on the website when needed."
+        : !job.preset.fields.session?.length ? "Class filters applied. Choose Session No on the website when needed."
         : snapshot.alreadyRecorded ? "Filters applied. Attendance is already recorded for this session." : "Your class is ready. You can take attendance on the website.", updatedAt: now });
   }
   if (next.type === "wait") {
@@ -164,18 +182,26 @@ async function advance(tabId, snapshot, stable) {
   }
   const attempts = { ...job.attempts, [next.field]: (job.attempts[next.field] || 0) + 1 };
   // Multi-section CheckBoxLists may require one postback per toggle.
-  const limit = next.field === "section" ? 20 : 4;
-  if (attempts[next.field] > limit) return fail(tabId, job, `${next.label} did not stay selected after the refresh. Review this field on the website.`, next.field);
-  const posts = ["dateMode", "classType"].includes(next.field) ? true
+  const limit = ["sectionClear", "sectionSelect"].includes(next.field) ? 1 : next.field === "section" ? 20 : 4;
+  if (attempts[next.field] > limit) {
+    const message = next.field === "sectionClear"
+      ? "The website did not refresh after clearing Section. Review the Section dropdown on the website."
+      : next.field === "sectionSelect"
+        ? "The website did not refresh after selecting the preset Section. Review the Section dropdown on the website."
+        : `${next.label} did not stay selected after the refresh. Review this field on the website.`;
+    return fail(tabId, job, message, next.field);
+  }
+  const posts = ["dateMode", "classType", "sectionClear", "sectionSelect"].includes(next.field) ? true
     : next.field === "date" ? true : snapshot.fields[next.field]?.posts;
   // Persist BEFORE dispatch: the current document can disappear during the action.
   const pending = { at: now, field: next.field, pageId: snapshot.pageId, revision: snapshot.revision, posted: posts };
   job = { ...job, attempts, pending, waitingFor: "", waitingSince: null, field: next.field,
+    sectionPhase: next.field === "sectionClear" ? "clearing" : next.field === "sectionSelect" ? "selecting" : job.sectionPhase,
     progress: next.index, message: `Selecting ${next.label.toLowerCase()}…`, updatedAt: now };
   await putJob(tabId, job);
   try {
     const result = await pageCall(tabId, "act", next, true);
-    if (result) await putJob(tabId, { ...job, pending: { ...pending, posted: result.posted } });
+    if (result) await putJob(tabId, { ...job, pending: { ...pending, posted: result.posted }, sectionPhase: next.field === "sectionClear" ? "cleared" : next.field === "sectionSelect" ? "selected" : job.sectionPhase });
   } catch (error) {
     if (/Manual filter input/.test(error.message)) return finish(tabId, { ...job, status: "stopped", pending: null, message: "Stopped because you are making changes on the website." });
     // Navigating destroys executeScript's response. A subsequent pageId proves completion.
@@ -188,10 +214,17 @@ async function advance(tabId, snapshot, stable) {
 async function getState(tabId) {
   // UI refreshes inspect extension storage and tab metadata only, never the DOM.
   let snapshot = snapshots.get(tabId)?.snapshot || null;
-  let connection = "Open Regular Class Attendance to connect.";
+  let connection = "Open Regular or Remedial Class Attendance to connect.";
   let connected = false;
-  try { connected = tabId != null && isPage((await chrome.tabs.get(tabId)).url); } catch { /* Tab closed. */ }
-  if (connected) connection = "Attendance page ready";
+  let currentPageType = null;
+  let tabUrl = "";
+  try { tabUrl = tabId != null ? (await chrome.tabs.get(tabId)).url || "" : ""; currentPageType = pageTypeForUrl(tabUrl); } catch { /* Tab closed. */ }
+  if (isSiteUrl(tabUrl) && !snapshots.get(tabId)?.snapshot) {
+    try { const current = await pageCall(tabId, "read"); if (current?.tablePage || current?.attendancePage) snapshots.set(tabId, { snapshot:current }); } catch { /* Page may be loading. */ }
+  }
+  snapshot = snapshots.get(tabId)?.snapshot || snapshot;
+  try { connected = tabId != null && (isPage(tabUrl) || Boolean(snapshot?.tablePage)); } catch { /* Tab closed. */ }
+  if (connected) connection = snapshot?.tablePage && !isPage(tabUrl) ? "Student table ready" : "Attendance page ready";
   else snapshot = null;
   const job = (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)] || null;
   const data = await readLocal();
@@ -199,9 +232,9 @@ async function getState(tabId) {
   const preference = (await chrome.storage.local.get("classflow.previousYear"))["classflow.previousYear"];
   const previousYear = preference || new Date().getFullYear();
   const clipboard = (await chrome.storage.local.get("classflow.attendanceCopy"))["classflow.attendanceCopy"];
-  const attendanceCopy = clipboard ? { copiedAt:clipboard.copiedAt, sessionLabel:clipboard.sessionLabel, date:clipboard.scope.date,
+  const attendanceCopy = clipboard ? { copiedAt:clipboard.copiedAt, pageType:clipboard.scope.pageType || "regular", sessionLabel:clipboard.sessionLabel, sectionLabel:clipboard.sectionLabel || "", date:clipboard.scope.date,
     courseLabel:clipboard.courseLabel, present:clipboard.students.filter(student=>student.present).length, absent:clipboard.students.filter(student=>!student.present).length } : null;
-  return { ...data, attendanceCopy, previousYear, tabId, settings: storedSettings || Core.runtimeFromSnapshot(snapshot || data.context), snapshot, connected, stable: true, connection, job, pageUrl: PAGE };
+  return { ...data, attendanceCopy, previousYear, tabId, pageType: currentPageType, tableAvailable: Boolean(snapshot?.tablePage), settings: storedSettings || Core.runtimeFromSnapshot(snapshot || { ...(data.context || {}), pageType: currentPageType }), snapshot, connected, stable: true, connection, job, pageUrl: pageUrl(currentPageType) };
 }
 function schedule(tabId, delay = 140) {
   clearTimeout(timers.get(tabId));
@@ -213,15 +246,16 @@ async function tick(tabId) {
     if (job?.status !== "running") return;
     try {
       const tab = await chrome.tabs.get(tabId);
-      if (!isPage(tab.url)) { await fail(tabId, job, "The attendance page was closed or changed. Reopen it and apply again."); return; }
+      const tableJob = ["attendance", "student-list"].includes(job.kind);
+      if (!(tableJob ? isSiteUrl(tab.url) : isPage(tab.url))) { await fail(tabId, job, "The student table was closed or changed. Reopen it and apply again."); return; }
       if (Date.now() - job.startedAt > 300000) { await fail(tabId, job, "This run expired. Apply the preset again."); return; }
       if (tab.status === "loading") { schedule(tabId, 220); return; }
-      const snapshot = await pageCall(tabId, job.kind === "attendance" ? "attendanceRead" : "read", null, true);
+      const snapshot = await pageCall(tabId, tableJob ? "attendanceRead" : "read", null, true);
       if (snapshot?.manualCancelled) {
         await finish(tabId, { ...job, status: "stopped", pending: null, message: "Stopped because you are making changes on the website." });
         return;
       }
-      if (!snapshot?.attendancePage) { await fail(tabId, job, "Attendance controls are unavailable. Check that you are signed in."); return; }
+      if (tableJob ? !snapshot?.tablePage : !snapshot?.attendancePage) { await fail(tabId, job, "The student table is unavailable. Check that the page is loaded."); return; }
       snapshots.set(tabId, { snapshot });
       const signature = snapshotSignature(snapshot);
       const previous = observations.get(tabId);
@@ -255,10 +289,11 @@ async function dispatch(message, sender) {
   await storageReady;
   const tabId = await resolveTab(message, sender);
   if (message.type === "OPEN_PAGE") {
-    if (message.newTab === true) await chrome.tabs.create({ url: PAGE, active: false });
+    const targetPage = pageUrl(message.pageType);
+    if (message.newTab === true) await chrome.tabs.create({ url: targetPage, active: false });
     else {
       if (!Number.isInteger(tabId)) throw new Error("Select a browser tab before opening attendance.");
-      await chrome.tabs.update(tabId, { url: PAGE });
+      await chrome.tabs.update(tabId, { url: targetPage });
     }
     return { ok: true };
   }
@@ -335,6 +370,17 @@ async function dispatch(message, sender) {
       return { category: newName };
     });
   }
+  if (message.type === "REORDER_CATEGORIES") {
+    return serial("presets", async () => {
+      if (!Array.isArray(message.names) || message.names.some(name => typeof name !== "string") || new Set(message.names.map(Core.normalize)).size !== message.names.length) throw new Error("Invalid category order.");
+      const { categories } = await readLocal();
+      const current = categories.map(Core.normalize).sort();
+      const next = message.names.map(Core.normalize).sort();
+      if (current.length !== next.length || current.some((name, index) => name !== next[index])) throw new Error("The saved categories changed. Refresh and try again.");
+      await chrome.storage.local.set({ "classflow.categories": message.names });
+      return { ok: true };
+    });
+  }
   if (message.type === "SET_CATEGORY_COLLAPSED") {
     return serial("presets", async () => {
       if (typeof message.key !== "string" || message.key.length > 59 || (message.key !== "uncategorized" && !message.key.startsWith("category:")) || typeof message.collapsed !== "boolean") throw new Error("Invalid category selection.");
@@ -365,8 +411,10 @@ async function dispatch(message, sender) {
   return serial(`tab:${tabId}`, async () => {
     if (message.type === "PANEL_OPEN") {
       const previous = (await chrome.storage.session.get(settingsKey(tabId)))[settingsKey(tabId)];
+      const tab = await chrome.tabs.get(tabId);
+      const pageType = pageTypeForUrl(tab.url) || previous?.pageType || "regular";
       await chrome.storage.session.set({ [settingsKey(tabId)]: {
-        dateMode: "current", classType: "theory", previousDate: previous?.previousDate || ""
+        pageType, dateMode: "current", classType: "theory", previousDate: previous?.previousDate || ""
       } });
     }
     else if (message.type === "SET_SETTINGS") {
@@ -374,28 +422,41 @@ async function dispatch(message, sender) {
       const validation = Core.validateSettings(message.settings, true);
       if (validation) throw new Error(validation);
       if (message.yearOverride !== undefined) await chrome.storage.local.set({ "classflow.previousYear": Number(message.yearOverride) });
-      await chrome.storage.session.set({ [settingsKey(tabId)]: { dateMode: message.settings.dateMode, classType: message.settings.classType,
+      await chrome.storage.session.set({ [settingsKey(tabId)]: { pageType: message.settings.pageType || "regular", dateMode: message.settings.dateMode, classType: message.settings.classType,
         previousDate: message.settings.previousDate || "" } });
+    }
+    else if (message.type === "DISMISS_JOB") {
+      await chrome.storage.session.remove(jobKey(tabId));
     }
     else if (message.type === "STOP") {
       const job = (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)];
       if (job?.status === "running") await finish(tabId, { ...job, status: "stopped", message: "Stopped. Selections already made remain on the website.", pending: null });
-    } else if (["COPY_ATTENDANCE","APPLY_ATTENDANCE","CLEAR_ATTENDANCE"].includes(message.type)) {
+    } else if (["COPY_ATTENDANCE","APPLY_ATTENDANCE","CLEAR_ATTENDANCE","PASTE_STUDENTS"].includes(message.type)) {
       const active=(await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)];
       if(active?.status==="running") throw new Error("Wait for the current operation to finish or stop it first.");
       if(message.type==="CLEAR_ATTENDANCE") await chrome.storage.local.remove("classflow.attendanceCopy");
       else {
-        if(!isPage((await chrome.tabs.get(tabId)).url)) throw new Error("Open the attendance page first.");
+        if(!isSiteUrl((await chrome.tabs.get(tabId)).url)) throw new Error("Open the Jain ERP student table first.");
         const current=await pageCall(tabId,"attendanceRead");
-        if(message.type==="COPY_ATTENDANCE") {
+        if (!current?.tablePage) throw new Error("The student table is not available on this page.");
+        snapshots.set(tabId, { snapshot: current });
+        if (message.type === "PASTE_STUDENTS") {
+          const parsed = Attendance.parseStudentUSNs(message.text, current);
+          const alreadyCount = parsed.usns.filter(usn => current.students.find(student => student.usn.toUpperCase() === usn)?.present === Boolean(message.present)).length;
+          const copy = Attendance.createStudentListCopy(parsed.usns, current, Boolean(message.present));
+          await putJob(tabId,{id:crypto.randomUUID(),kind:"attendance",preset:{name:message.present ? "Mark listed students present" : "Mark listed students absent",pageType:current.pageType},copy,target:copy.scope,alreadyCount,changedCount:parsed.usns.length-alreadyCount,status:"running",startedAt:Date.now(),updatedAt:Date.now(),progress:0,total:parsed.usns.length,attempts:{},pending:null,message:`Checking ${parsed.usns.length} listed student${parsed.usns.length === 1 ? "" : "s"}...`});
+          await chrome.alarms.create(`classflow.run.${tabId}`,{delayInMinutes:1,periodInMinutes:1});
+          schedule(tabId,0);
+        } else if(message.type==="COPY_ATTENDANCE") {
           const copy=Attendance.capture(current);
-          copy.courseLabel=current.fields.course.selected.map(option=>option.label).join(", ");
+          copy.courseLabel=current.fields.course?.selected?.map(option=>option.label).join(", ") || "Student table";
+          copy.pageLabel = current.pageType === "remedial" ? "Remedial attendance" : current.pageType === "regular" ? "Regular attendance" : "Student-table attendance";
           await chrome.storage.local.set({"classflow.attendanceCopy":copy});
         } else {
           const copy=(await chrome.storage.local.get("classflow.attendanceCopy"))["classflow.attendanceCopy"];
           const next=Attendance.plan(copy,current);
           if(next.type==="error") throw new Error(next.message);
-          await putJob(tabId,{id:crypto.randomUUID(),kind:"attendance",preset:{name:"Apply attendance"},copy,target:next.scope,status:"running",startedAt:Date.now(),updatedAt:Date.now(),progress:0,total:next.total,attempts:{},pending:null,message:"Checking the student list..."});
+          await putJob(tabId,{id:crypto.randomUUID(),kind:"attendance",preset:{name:"Apply attendance",pageType:copy.scope.pageType},copy,target:next.scope,status:"running",startedAt:Date.now(),updatedAt:Date.now(),progress:0,total:next.total,attempts:{},pending:null,message:"Checking the student list..."});
           await chrome.alarms.create(`classflow.run.${tabId}`,{delayInMinutes:1,periodInMinutes:1});
           schedule(tabId,0);
         }
@@ -403,24 +464,28 @@ async function dispatch(message, sender) {
     } else if (message.type === "CAPTURE") {
       const job = (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)];
       if (job?.status === "running") throw new Error("Wait for the current filter application to finish.");
-      if (!isPage((await chrome.tabs.get(tabId)).url)) throw new Error("Open Regular Class Attendance first.");
+      if (!isPage((await chrome.tabs.get(tabId)).url)) throw new Error("Open a Jain ERP attendance page first.");
       const snapshot = await pageCall(tabId, "read");
       if (!snapshot?.attendancePage || snapshot.busy) throw new Error("Wait for the attendance page to finish loading, then capture again.");
       snapshots.set(tabId, { snapshot });
       await collectCache(snapshot);
     } else if (message.type === "APPLY") {
       const tab = await chrome.tabs.get(tabId);
-      if (!isPage(tab.url)) throw new Error("Open the attendance page first.");
+      if (!isPage(tab.url)) throw new Error("Open a Jain ERP attendance page first.");
       const active = (await chrome.storage.session.get(jobKey(tabId)))[jobKey(tabId)];
       if (active?.status === "running") throw new Error("A preset is already being applied. Stop it first.");
       const { presets } = await readLocal();
       const preset = presets.find(item => item.id === message.id);
       const validation = Core.validatePreset(preset);
       if (validation) throw new Error(validation);
+      const currentPageType = pageTypeForUrl(tab.url);
+      if (currentPageType !== preset.pageType) {
+        throw new Error(`This preset is for the ${preset.pageType === "remedial" ? "Remedial" : "Regular"} Class Attendance page. Open that page before applying it.`);
+      }
       const current = await pageCall(tabId, "read");
       if (!current?.attendancePage || current.busy) throw new Error("Wait for the attendance page to finish refreshing, then apply your class.");
       const selectedSettings = (await chrome.storage.session.get(settingsKey(tabId)))[settingsKey(tabId)] || Core.runtimeFromSnapshot(snapshots.get(tabId)?.snapshot || (await readLocal()).context);
-      const settings = Core.settingsForPreset(preset, selectedSettings);
+      const settings = Core.settingsForPreset(preset, { ...selectedSettings, pageType: currentPageType });
       const settingsError = Core.validateSettings(settings);
       if (settingsError) throw new Error(settingsError);
       await putJob(tabId, { id: crypto.randomUUID(), preset, settings, status: "running", startedAt: Date.now(), updatedAt: Date.now(),

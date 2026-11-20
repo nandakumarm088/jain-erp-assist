@@ -32,8 +32,11 @@
     let lastView = "";
     let visibleFeedback = new Map();
     let dateEntry = null;
+    let studentListText = "";
+    let pasteOpen = false;
     let dateWrites = Promise.resolve();
     let draggedPreset = null;
+    let draggedCategory = null;
     let successTimer = null;
     let removalTimer = null;
     let categoryFormOpen = false;
@@ -46,11 +49,11 @@
     function fieldOptions(field) {
       // Editing uses the explicitly captured/remembered class context, not the
       // independent settings chosen for the next Apply.
-      const reference = context();
+      const reference = { ...context(), pageType: draft?.pageType || context().pageType };
       const key = Core.cacheKey(reference, field.key, draft, Core.runtimeFromSnapshot(reference));
       const cached = state.cache[key];
       const live = state.snapshot;
-      const sameContext = live && Core.cacheKey(live, field.key) === key && !live.busy;
+      const sameContext = live && live.pageType === reference.pageType && Core.cacheKey(live, field.key) === key && !live.busy;
       const hasLiveOptions = sameContext && live.fields[field.key].options.length > 0;
       const data = hasLiveOptions ? live.fields[field.key].options : cached?.options || [];
       return { options: data, source: hasLiveOptions ? "live" : cached ? "remembered" : "none", observedAt: cached?.observedAt };
@@ -61,29 +64,33 @@
     function connection() {
       return `<div class="cf-connection ${state.connected ? "is-connected" : ""}" title="${esc(state.connection)}" aria-label="${esc(state.connection)}"><span class="cf-dot"></span>${state.connected ? '<span>Ready</span>' : '<button data-action="open-page" class="cf-text-button">Open page</button>'}</div>`;
     }
+    function pageNavigation() {
+      return `<section class="cf-page-navigation" aria-label="Attendance page navigation"><button type="button" class="cf-open-attendance" data-action="open-page" data-page-type="regular" title="Open regular attendance" ${busy || isRunning() ? "disabled" : ""}>Regular attendance ${icon("arrow")}</button><button type="button" class="cf-open-attendance" data-action="open-remedial-page" data-page-type="remedial" title="Open remedial attendance" ${busy || isRunning() ? "disabled" : ""}>Remedial attendance ${icon("arrow")}</button></section>`;
+    }
     function runtimeControls() {
       const settings = state.settings || Core.runtimeFromSnapshot(state.snapshot);
       const disabled = busy || isRunning() || !state.connected ? "disabled" : "";
+      const pageType = state.pageType || settings.pageType || "regular";
       const [year, month, day] = (settings.previousDate || `${state.previousYear || new Date().getFullYear()}--`).split("-");
       if (!dateEntry) dateEntry = { dayMonth: day ? `${day}/${month || ''}` : '', year };
-      return `<section class="cf-runtime" aria-label="Settings for this attendance"><div class="cf-runtime-title"><h2>Attendance settings</h2><button type="button" class="cf-open-attendance" data-action="open-page" title="Open attendance in this tab (Ctrl-click for a new tab)" ${busy || isRunning() ? "disabled" : ""}>Open attendance ${icon("arrow")}</button></div>
+      return `<section class="cf-runtime" aria-label="Settings for this attendance"><div class="cf-runtime-title"><h2>Attendance settings</h2></div>
         <div class="cf-form-field"><label>Date</label><div class="cf-segment" role="group" aria-label="Date mode">${["current", "previous"].map(mode => `<button type="button" data-action="date-mode" data-value="${mode}" aria-pressed="${settings.dateMode === mode}" class="${settings.dateMode === mode ? "is-selected" : ""}" ${disabled}>${mode === "current" ? "Current Date" : "Previous Date"}</button>`).join("")}</div>
         ${settings.dateMode === "previous" ? `<div class="cf-date-parts" role="group" aria-label="Previous attendance date">
           <div class="cf-date-part"><label for="cf-date-daymonth">Day / Month</label><div class="cf-date-control"><input id="cf-date-daymonth" aria-label="Day / Month" type="text" inputmode="numeric" autocomplete="off" placeholder="DD/MM" maxlength="5" value="${esc(dateEntry.dayMonth)}" ${disabled}><button type="button" class="cf-date-reset" data-action="reset-date" aria-label="Reset day and month" ${disabled}>Reset</button></div></div>
           <label>Year<input id="cf-date-year" aria-label="Year" type="text" inputmode="numeric" autocomplete="off" maxlength="4" pattern="[1-9][0-9]{3}" value="${esc(dateEntry.year)}" ${disabled}></label>
         </div><small id="cf-date-hint" class="cf-date-hint" aria-live="polite"></small>` : ''}</div>
-        <div class="cf-form-field"><label>Class type</label><div class="cf-segment" role="group" aria-label="Class type">${["theory", "lab"].map(type => `<button type="button" data-action="class-type" data-value="${type}" aria-pressed="${settings.classType === type}" class="${settings.classType === type ? "is-selected" : ""}" ${disabled}>${type === "lab" ? "Lab" : "Theory"}</button>`).join("")}</div></div>
+        ${pageType === "regular" ? `<div class="cf-form-field"><label>Class type</label><div class="cf-segment" role="group" aria-label="Class type">${["theory", "lab"].map(type => `<button type="button" data-action="class-type" data-value="${type}" aria-pressed="${settings.classType === type}" class="${settings.classType === type ? "is-selected" : ""}" ${disabled}>${type === "lab" ? "Lab" : "Theory"}</button>`).join("")}</div></div>` : '<p class="cf-page-hint">Period No remains manual for remedial attendance.</p>'}
         </section>`;
     }
     function progress(section) {
       const job = state.job;
-      if (!job || (job.kind === "attendance" ? "attendance" : "library") !== section || (error && errorSection === section) || (job.status === "done" && Date.now() >= job.updatedAt + 2000)) return "";
+      if (!job || (["attendance", "student-list"].includes(job.kind) ? "attendance" : "library") !== section || (error && errorSection === section) || (["done", "stopped"].includes(job.status) && Date.now() >= job.updatedAt + 2000)) return "";
       const running = job.status === "running";
       return `<section class="cf-progress cf-progress-${esc(job.status)}" role="status" aria-live="polite">
-        <div class="cf-progress-top"><strong>${running ? '<span class="cf-spinner"></span>' : icon(job.status === "done" ? "check" : "clock")}${esc(running ? job.preset.name : job.status === "done" ? (job.kind === "attendance" ? "Attendance applied" : "Filters applied") : job.status === "error" ? "Needs your attention" : "Run stopped")}</strong>
-          ${running ? '<button class="cf-text-button" data-action="stop">Stop</button>' : ''}</div>
-        ${job.status !== "done" ? `<p>${esc(job.message)}</p>` : ''}${running ? `<div class="cf-meter" role="progressbar" aria-label="Applying selections" aria-valuemin="0" aria-valuemax="${job.total || 11}" aria-valuenow="${job.progress || 0}"><i style="width:${Math.max(4, (job.progress || 0) / (job.total || 11) * 100)}%"></i></div><small>${job.kind === "attendance" ? "Review and Save on the website when finished" : "Checking each selection on the live page"}</small>` : ''}
-        ${job.status === "error" && job.kind !== "attendance" && !job.websiteMessage ? ["dateMode", "classType", "date"].includes(job.field)
+        <div class="cf-progress-top"><strong>${running ? '<span class="cf-spinner"></span>' : icon(job.status === "done" ? "check" : "clock")}${esc(running ? job.preset.name : job.status === "done" ? (job.kind === "attendance" ? "Attendance applied" : job.kind === "student-list" ? "Student list updated" : "Filters applied") : job.status === "error" ? "Needs your attention" : "Run stopped")}</strong>
+          ${running ? '<button class="cf-text-button" data-action="stop">Stop</button>' : job.status === "error" ? '<button class="cf-text-button" data-action="dismiss-job">Dismiss</button>' : ''}</div>
+        ${job.status !== "done" ? `<p>${esc(job.message)}</p>` : ''}${running ? `<div class="cf-meter" role="progressbar" aria-label="Applying selections" aria-valuemin="0" aria-valuemax="${job.total || 11}" aria-valuenow="${job.progress || 0}"><i style="width:${Math.max(4, (job.progress || 0) / (job.total || 11) * 100)}%"></i></div><small>${job.kind === "attendance" ? "Review and Save on the website when finished" : job.kind === "student-list" ? "Refreshing the website after each student" : "Checking each selection on the live page"}</small>` : ''}
+        ${job.status === "error" && !["attendance", "student-list"].includes(job.kind) && !job.websiteMessage ? ["dateMode", "classType", "date"].includes(job.field)
           ? `<button class="cf-text-button" data-action="review-settings">Review attendance settings ${icon("arrow")}</button>`
           : `<button class="cf-text-button" data-action="edit" data-id="${esc(job.preset.id)}">Review this preset ${icon("arrow")}</button>` : ''}</section>`;
     }
@@ -113,7 +120,7 @@
       if (groups.has("uncategorized")) ordered.push(groups.get("uncategorized"));
       return ordered.map((group, index) => {
         const collapsed = !filter.trim() && (state.collapsedCategories || []).includes(group.key);
-        return `<section class="cf-category" data-category-key="${esc(group.key)}"><div class="cf-category-heading"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3>${group.key !== "uncategorized" ? `<button type="button" class="cf-category-action" data-action="rename-category" data-name="${esc(group.name)}" aria-label="Rename category ${esc(group.name)}" title="Rename category" ${busy || isRunning() ? "disabled" : ""}>${icon("edit")}</button><button type="button" class="cf-category-action" data-action="ask-delete-category" data-name="${esc(group.name)}" data-category="${esc(group.key)}" aria-label="Delete category ${esc(group.name)}" title="Delete category" ${busy || isRunning() ? "disabled" : ""}>${icon("trash")}</button>` : ''}</div>${pendingCategoryDelete === group.key ? `<div class="cf-category-confirm" role="group" aria-label="Delete ${esc(group.name)}"><span>Classes move to Uncategorized.</span><button type="button" class="cf-text-button cf-category-confirm-delete" data-action="delete-category" data-name="${esc(group.name)}">Delete</button><button type="button" class="cf-text-button" data-action="cancel-delete-category">Cancel</button></div>` : ''}<div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.length ? group.presets.map(card).join("") : '<p class="cf-category-empty">No classes yet.</p>'}</div></section>`;
+        return `<section class="cf-category" data-category-key="${esc(group.key)}" draggable="${group.key !== "uncategorized" && !filter.trim() && !busy && !isRunning()}"><div class="cf-category-heading"><h3><button type="button" class="cf-category-toggle" data-action="toggle-category" data-category="${esc(group.key)}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-expanded="${!collapsed}" aria-controls="cf-category-${index}" ${busy || isRunning() || filter.trim() ? "disabled" : ""}><span class="cf-category-chevron">${icon("chevron")}</span><span class="cf-category-name">${esc(group.name)}</span><span class="cf-category-count">${group.presets.length}</span></button></h3>${group.key !== "uncategorized" ? `<button type="button" class="cf-category-action" data-action="rename-category" data-name="${esc(group.name)}" aria-label="Rename category ${esc(group.name)}" title="Rename category" ${busy || isRunning() ? "disabled" : ""}>${icon("edit")}</button><button type="button" class="cf-category-action" data-action="ask-delete-category" data-name="${esc(group.name)}" data-category="${esc(group.key)}" aria-label="Delete category ${esc(group.name)}" title="Delete category" ${busy || isRunning() ? "disabled" : ""}>${icon("trash")}</button>` : ''}</div>${pendingCategoryDelete === group.key ? `<div class="cf-category-confirm" role="group" aria-label="Delete ${esc(group.name)}"><span>Classes move to Uncategorized.</span><button type="button" class="cf-text-button cf-category-confirm-delete" data-action="delete-category" data-name="${esc(group.name)}">Delete</button><button type="button" class="cf-text-button" data-action="cancel-delete-category">Cancel</button></div>` : ''}<div id="cf-category-${index}" class="cf-category-items" ${collapsed ? "hidden" : ""}>${group.presets.length ? group.presets.map(card).join("") : '<p class="cf-category-empty">No classes yet.</p>'}</div></section>`;
       }).join("") || '<div class="cf-no-results">No classes match your search.</div>';
     }
     function library() {
@@ -130,9 +137,10 @@
       const copy=state.attendanceCopy;
       const disabled=busy || isRunning() || !state.connected ? "disabled" : "";
       return `<section class="cf-attendance" aria-label="Attendance copying"><div class="cf-section-title"><h2>Attendance</h2>${copy ? `<button class="cf-text-button" data-action="clear-attendance" aria-label="Clear copied attendance" ${busy || isRunning() ? "disabled" : ""}>Clear</button>` : ''}</div>
-        ${copy ? `<p class="cf-attendance-summary" title="${esc(copy.courseLabel)}">${esc(copy.sessionLabel)} &middot; ${copy.present} present &middot; ${copy.absent} absent<br><span>${esc(copy.date)}</span></p>` : ''}
+        ${copy ? `<p class="cf-attendance-summary" title="${esc(copy.courseLabel)}">${esc(copy.pageType === "remedial" ? "Remedial attendance copied" : copy.pageType === "table" ? "Student-table attendance copied" : "Regular attendance copied")}<br>${copy.sectionLabel ? `${esc(copy.sectionLabel)} &middot; ` : ""}${esc(copy.sessionLabel)} &middot; ${copy.present} present &middot; ${copy.absent} absent<br><span>${esc(copy.date)}</span></p>` : ''}
         <div class="cf-attendance-actions"><button class="cf-primary cf-copy" data-action="copy-attendance" ${disabled}>${copy ? "Copy again" : "Copy attendance"}</button>${copy ? `<button class="cf-primary" data-action="apply-attendance" ${disabled}>Apply to this session</button>` : ''}</div>
-        <p class="cf-attendance-hint">${copy ? "Restore here or apply to another session. Review and Save on the website." : "Mark absentees on the website, then copy for the next session."}</p></section>`;
+        <div class="cf-paste-students"><button type="button" class="cf-paste-toggle" data-action="toggle-paste" aria-expanded="${pasteOpen}">${icon("chevron")}<span>Paste Student USNs</span></button>${pasteOpen ? `<div class="cf-paste-body"><div class="cf-paste-label-row"><label for="cf-student-usns">Student USNs</label><button type="button" class="cf-paste-clear" data-action="clear-student-list" ${busy || isRunning() ? "disabled" : ""}>Clear</button></div><textarea id="cf-student-usns" rows="3" placeholder="Paste USNs from Excel or a list">${esc(studentListText)}</textarea><div class="cf-attendance-actions"><button class="cf-secondary" data-action="mark-listed-absent" ${disabled}>Mark listed Absent</button><button class="cf-secondary" data-action="mark-listed-present" ${disabled}>Mark listed Present</button></div><small>Only listed students change. Unmatched USNs are reported before anything is changed.</small></div>` : ''}</div>
+        <p class="cf-attendance-hint">${copy ? `Restore ${copy.pageType === "remedial" ? "remedial" : copy.pageType === "table" ? "student-table" : "regular"} attendance here. Review and Save on the website.` : "Mark absentees on the website, then copy for the next session."}</p></section>`;
     }
     function fieldEditor(field) {
       const data = fieldOptions(field);
@@ -153,9 +161,10 @@
       return `<div class="cf-editor"><button class="cf-back" data-action="back">${icon("back")} Saved classes</button>
         <h1>${draft.id ? "Edit class" : "Save class"}</h1><p class="cf-editor-intro">Save your class filters. Session No and a fixed class type are optional.</p>
         <form id="cf-form"><div class="cf-form-field"><label for="cf-name">Class name</label><input id="cf-name" placeholder="e.g. Cyber Security · Lab 1" maxlength="80" value="${esc(draft.name)}" required autocomplete="off"></div>
-        ${Core.FIELDS.map(fieldEditor).join("")}
+        <p class="cf-page-hint">Page: <strong>${draft.pageType === "remedial" ? "Remedial Class Attendance" : "Regular Class Attendance"}</strong></p>
+        ${Core.fieldsFor(draft).map(fieldEditor).join("")}
         <div class="cf-form-field"><label for="cf-category">Category <small class="cf-optional">Optional</small></label><div class="cf-category-picker"><select id="cf-category"><option value="">No category</option>${categories.map(name => `<option value="${esc(name)}" ${Core.normalize(draft.category) === Core.normalize(name) ? "selected" : ""}>${esc(name)}</option>`).join("")}</select><button type="button" class="cf-category-new" data-action="new-category" aria-label="New category">${icon("plus")}</button></div>${categoryCreator()}</div>
-        <fieldset class="cf-save-mode"><legend>Class type <span class="cf-optional">Optional</span></legend><div class="cf-segment" role="group" aria-label="Preset class type">${[["", "Filters only"], ["theory", "Theory"], ["lab", "Lab"]].map(([value,label]) => `<button type="button" data-action="preset-type" data-value="${value}" aria-pressed="${(draft.classTypeOverride || "") === value}" class="${(draft.classTypeOverride || "") === value ? "is-selected" : ""}">${label}</button>`).join("")}</div><p id="cf-save-summary" role="status">${draft.classTypeOverride ? `Saving as <strong>${draft.classTypeOverride === "lab" ? "Lab" : "Theory"}</strong>. This overrides the class type in Attendance settings.` : 'Saving <strong>filters only</strong>. Theory/Lab will use Attendance settings.'}</p></fieldset>
+        ${draft.pageType === "regular" ? `<fieldset class="cf-save-mode"><legend>Class type <span class="cf-optional">Optional</span></legend><div class="cf-segment" role="group" aria-label="Preset class type">${[["", "Filters only"], ["theory", "Theory"], ["lab", "Lab"]].map(([value,label]) => `<button type="button" data-action="preset-type" data-value="${value}" aria-pressed="${(draft.classTypeOverride || "") === value}" class="${(draft.classTypeOverride || "") === value ? "is-selected" : ""}">${label}</button>`).join("")}</div><p id="cf-save-summary" role="status">${draft.classTypeOverride ? `Saving as <strong>${draft.classTypeOverride === "lab" ? "Lab" : "Theory"}</strong>. This overrides the class type in Attendance settings.` : 'Saving <strong>filters only</strong>. Theory/Lab will use Attendance settings.'}</p></fieldset>` : '<p class="cf-page-hint">Period No is not saved; choose it manually after applying this remedial preset.</p>'}
         <div class="cf-editor-actions">${draft.id ? `<button type="button" class="cf-icon-button cf-delete" data-action="delete" data-id="${esc(draft.id)}" aria-label="Delete this preset">${icon("trash")}</button>` : ''}<button type="button" class="cf-secondary" data-action="back">Cancel</button><button type="submit" class="cf-primary" ${busy ? "disabled" : ""}>${busy ? "Saving…" : "Save preset"}${icon("check")}</button></div></form></div>`;
     }
     function render() {
@@ -167,7 +176,7 @@
       const scroll = lastView === view ? container.querySelector(".cf-body")?.scrollTop || 0 : 0;
       lastView = view;
       container.innerHTML = `<section class="cf-shell" aria-label="Jain ERP Assist attendance filters and copying">
-        ${header()}<div class="cf-body">${feedback("header")}${draft ? editor() + feedback("editor") : attendanceControls() + feedback("attendance") + runtimeControls() + feedback("runtime") + library() + feedback("library")}</div>
+        ${header()}<div class="cf-body">${feedback("header")}${draft ? editor() + feedback("editor") : pageNavigation() + attendanceControls() + feedback("attendance") + runtimeControls() + feedback("runtime") + library() + feedback("library")}</div>
         ${!draft ? `<div class="cf-capture-zone"><button class="cf-capture" data-action="capture" ${busy || !state.connected || isRunning() ? "disabled" : ""}>${icon("capture")} Save this class</button>${feedback("capture")}<p class="cf-credit">Made by NK Developers</p></div>` : ''}</section>`;
       const body = container.querySelector(".cf-body");
       if (body) body.scrollTop = scroll;
@@ -202,7 +211,7 @@
       if (state.tabId !== next.tabId) dateEntry = null;
       state = next;
       clearTimeout(successTimer);
-      if (state.job?.status === "done") {
+      if (["done", "stopped"].includes(state.job?.status)) {
         const remaining = state.job.updatedAt + 2000 - Date.now();
         if (remaining > 0) successTimer = setTimeout(() => render(), remaining + 10);
       }
@@ -225,21 +234,23 @@
     function startDraft(preset = null, capture = false) {
       categoryFormOpen = false; categoryName = ""; editingCategory = null; pendingCategoryDelete = null;
       const live = state.snapshot;
-      draft = preset ? structuredClone(preset) : { name: "", category: "", classTypeOverride: null, fields: Object.fromEntries(Core.FIELDS.map(field => [field.key, capture ? structuredClone(live?.fields[field.key].selected || []) : []])),
+      const pageType = preset ? Core.pageTypeOf(preset.pageType) : Core.pageTypeOf(state.pageType || live?.pageType);
+      draft = preset ? structuredClone(preset) : { name: "", category: "", pageType, classTypeOverride: null, fields: Object.fromEntries(Core.fieldsFor(pageType).map(field => [field.key, capture ? structuredClone(live?.fields[field.key]?.selected || []) : []])),
         scope: { origin: context().origin, account: context().account } };
       error = ""; notice = ""; errorSection = noticeSection = "editor";
       if (capture) {
         const course = labelOf(draft, "course").split(":")[0];
         draft.name = course || "";
-        const missing = Core.FIELDS.filter(field => !field.optional && !draft.fields[field.key]?.length);
+        const missing = Core.fieldsFor(draft).filter(field => !field.optional && !draft.fields[field.key]?.length);
         if (missing.length) notice = `Captured available selections. Still choose: ${missing.map(field => field.label).join(", ")}.`;
       }
       render();
       container.querySelector("#cf-name")?.focus();
     }
     function clearAfter(key) {
-      const index = Core.FIELDS.findIndex(field => field.key === key);
-      Core.FIELDS.slice(index + 1).forEach(field => { draft.fields[field.key] = []; });
+      const fields = Core.fieldsFor(draft);
+      const index = fields.findIndex(field => field.key === key);
+      fields.slice(index + 1).forEach(field => { draft.fields[field.key] = []; });
     }
     function dateSettings() {
       const [day = "", month = ""] = dateEntry.dayMonth.split("/");
@@ -274,6 +285,7 @@
       }
 
       if (event.target.id === "cf-name") draft.name = event.target.value;
+      if (event.target.id === "cf-student-usns") studentListText = event.target.value;
       if (event.target.id === "cf-new-category") categoryName = event.target.value;
       if (event.target.id === "cf-search") { filter = event.target.value; render(); }
     });
@@ -306,7 +318,7 @@
         dateWrites.catch(failure => { error = failure.message; errorSection = "runtime"; render(); });
         return;
       }
-      const field = Core.FIELDS.find(item => item.key === event.target.dataset.field);
+      const field = Core.fieldsFor(draft).find(item => item.key === event.target.dataset.field);
       if (!field || !draft) return;
       const data = fieldOptions(field).options;
       const find = value => data.find(option => option.value === value) || draft.fields[field.key].find(option => option.value === value);
@@ -335,14 +347,36 @@
       await request({ type: "REORDER_PRESETS", ids });
       await refresh();
     }
-    const clearDrag = () => container.querySelectorAll(".cf-drop-before,.cf-drop-after").forEach(row => row.classList.remove("cf-drop-before", "cf-drop-after"));
+    async function reorderCategories(names) {
+      await request({ type: "REORDER_CATEGORIES", names });
+      await refresh();
+    }
+    const clearCategoryDrag = () => container.querySelectorAll(".cf-category-drop-before,.cf-category-drop-after").forEach(row => row.classList.remove("cf-category-drop-before", "cf-category-drop-after"));
     container.addEventListener("dragstart", event => {
+      const category = event.target.closest(".cf-category[data-category-key]");
+      if (category && category.dataset.categoryKey !== "uncategorized" && !filter.trim() && !busy && !isRunning()) {
+        draggedCategory = category.dataset.categoryKey;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", draggedCategory);
+        return;
+      }
       const row = event.target.closest("[data-preset-id]");
       if (!row || busy || isRunning() || event.target.closest('[data-action="edit"]')) { event.preventDefault(); return; }
       draggedPreset = row.dataset.presetId;
       event.dataTransfer.effectAllowed = "move";
       event.dataTransfer.setData("text/plain", draggedPreset);
     });
+    container.addEventListener("dragover", event => {
+      if (draggedCategory) {
+        const row = event.target.closest(".cf-category[data-category-key]");
+        if (!row || row.dataset.categoryKey === "uncategorized" || row.dataset.categoryKey === draggedCategory || busy || isRunning()) return;
+        event.preventDefault(); event.dataTransfer.dropEffect = "move";
+        clearCategoryDrag();
+        row.classList.add(event.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2 ? "cf-category-drop-before" : "cf-category-drop-after");
+        return;
+      }
+    });
+    const clearDrag = () => container.querySelectorAll(".cf-drop-before,.cf-drop-after").forEach(row => row.classList.remove("cf-drop-before", "cf-drop-after"));
     container.addEventListener("dragover", event => {
       const row = event.target.closest("[data-preset-id]");
       if (!draggedPreset || !row || row.dataset.presetId === draggedPreset || busy || isRunning()) return;
@@ -352,6 +386,22 @@
       row.classList.add(event.clientY < row.getBoundingClientRect().top + row.offsetHeight / 2 ? "cf-drop-before" : "cf-drop-after");
     });
     container.addEventListener("drop", async event => {
+      if (draggedCategory) {
+        const row = event.target.closest(".cf-category[data-category-key]");
+        const from = draggedCategory; draggedCategory = null;
+        if (!row || row.dataset.categoryKey === "uncategorized" || row.dataset.categoryKey === from || busy || isRunning()) { clearCategoryDrag(); return; }
+        event.preventDefault();
+        const names = [...state.categories];
+        const source = names.findIndex(name => `category:${Core.normalize(name)}` === from);
+        const targetIndex = names.findIndex(name => `category:${Core.normalize(name)}` === row.dataset.categoryKey);
+        if (source < 0 || targetIndex < 0) return;
+        const after = event.clientY >= row.getBoundingClientRect().top + row.offsetHeight / 2;
+        const [name] = names.splice(source, 1);
+        names.splice(names.findIndex(value => `category:${Core.normalize(value)}` === row.dataset.categoryKey) + Number(after), 0, name);
+        clearCategoryDrag();
+        try { await reorderCategories(names); } catch (failure) { error = failure.message; errorSection = "library"; render(); }
+        return;
+      }
       const row = event.target.closest("[data-preset-id]");
       if (!draggedPreset || !row || busy || isRunning()) return;
       event.preventDefault();
@@ -363,9 +413,21 @@
       ids.splice(ids.indexOf(row.dataset.presetId) + Number(after), 0, from);
       try { await reorderPresets(ids); } catch (failure) { error = failure.message; errorSection = "library"; render(); }
     });
-    container.addEventListener("dragend", () => { draggedPreset = null; clearDrag(); });
+    container.addEventListener("dragend", () => { draggedPreset = null; draggedCategory = null; clearDrag(); clearCategoryDrag(); });
     container.addEventListener("keydown", async event => {
       if (event.target.id === "cf-new-category" && event.key === "Enter") { event.preventDefault(); container.querySelector('[data-action="create-category"]')?.click(); return; }
+      const categoryButton = event.target.closest('[data-action="toggle-category"]');
+      if (categoryButton && categoryButton.dataset.category !== "uncategorized" && event.altKey && ["ArrowUp", "ArrowDown"].includes(event.key) && !busy && !isRunning() && !filter.trim()) {
+        event.preventDefault();
+        const names = [...state.categories];
+        const current = names.findIndex(name => `category:${Core.normalize(name)}` === categoryButton.dataset.category);
+        const next = current + (event.key === "ArrowUp" ? -1 : 1);
+        if (current < 0 || next < 0 || next >= names.length) return;
+        [names[current], names[next]] = [names[next], names[current]];
+        try { await reorderCategories(names); container.querySelector(`[data-action="toggle-category"][data-category="${CSS.escape(categoryButton.dataset.category)}"]`)?.focus(); }
+        catch (failure) { error = failure.message; errorSection = "library"; render(); }
+        return;
+      }
       const button = event.target.closest('[data-action="apply"]');
       if (!button || !event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key) || busy || isRunning()) return;
       event.preventDefault();
@@ -384,14 +446,23 @@
       if (!target || target.disabled) return;
       const action = target.dataset.action;
       if (action === "import-presets") { container.querySelector("#cf-import-file").click(); return; }
-      const actionSection = ["copy-attendance", "apply-attendance", "clear-attendance"].includes(action) ? "attendance"
-        : action === "stop" ? (state.job?.kind === "attendance" ? "attendance" : "library")
-        : ["reset-date", "date-mode", "class-type", "open-page", "review-settings"].includes(action) ? "runtime"
+      const actionSection = ["copy-attendance", "apply-attendance", "clear-attendance", "mark-listed-present", "mark-listed-absent", "toggle-paste", "clear-student-list"].includes(action) ? "attendance"
+        : ["stop", "dismiss-job"].includes(action) ? (["attendance", "student-list"].includes(state.job?.kind) ? "attendance" : "library")
+        : ["reset-date", "date-mode", "class-type", "open-page", "open-remedial-page", "review-settings"].includes(action) ? "runtime"
          : ["new-category", "create-category", "cancel-category", "rename-category", "ask-delete-category", "delete-category", "cancel-delete-category"].includes(action) ? (draft ? "editor" : "library")
         : action === "capture" ? "capture" : ["new", "edit", "preset-type"].includes(action) ? "editor" : "library";
       try {
         await dateWrites;
-        if (action === "reset-date") {
+        if (action === "toggle-paste") {
+          pasteOpen = !pasteOpen;
+          render();
+        }
+        else if (action === "clear-student-list") {
+          studentListText = "";
+          render();
+          container.querySelector("#cf-student-usns")?.focus({ preventScroll:true });
+        }
+        else if (action === "reset-date") {
           dateEntry.dayMonth = "";
           await saveSettings(dateSettings());
           container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true });
@@ -399,6 +470,10 @@
         else if (["copy-attendance","apply-attendance","clear-attendance"].includes(action)) {
           error=""; notice=""; busy=true; render();
           update(await request({type:{"copy-attendance":"COPY_ATTENDANCE","apply-attendance":"APPLY_ATTENDANCE","clear-attendance":"CLEAR_ATTENDANCE"}[action]}));
+        }
+        else if (["mark-listed-present", "mark-listed-absent"].includes(action)) {
+          error = ""; notice = ""; busy = true; render();
+          update(await request({ type:"PASTE_STUDENTS", text:studentListText, present:action === "mark-listed-present" }));
         }
         else if (action === "new-category") {
           categoryFormOpen = true; categoryName = ""; editingCategory = null; pendingCategoryDelete = null; error = "";
@@ -438,7 +513,7 @@
           setTimeout(() => URL.revokeObjectURL(url), 1000);
           removed = null; error = ""; notice = "Presets exported."; noticeSection = "library";
         }
-        else if (action === "open-page") await request({ type: "OPEN_PAGE", newTab: event.ctrlKey });
+        else if (action === "open-page" || action === "open-remedial-page") await request({ type: "OPEN_PAGE", pageType: action === "open-remedial-page" ? "remedial" : "regular", newTab: event.ctrlKey });
         else if (action === "review-settings") { container.querySelector(".cf-body").scrollTop = 0; container.querySelector("#cf-date-daymonth")?.focus({ preventScroll: true }); }
         else if (action === "new") startDraft();
         else if (action === "capture") {
@@ -463,6 +538,7 @@
           error = ""; notice = ""; busy = true; render();
           update(await request({ type: "APPLY", id: target.dataset.id }));
         } else if (action === "stop") update(await request({ type: "STOP" }));
+        else if (action === "dismiss-job") update(await request({ type: "DISMISS_JOB" }));
         else if (action === "delete") {
           removed = state.presets.find(item => item.id === target.dataset.id);
           await request({ type: "DELETE_PRESET", id: target.dataset.id });
