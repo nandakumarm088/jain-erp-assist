@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Jain ERP Assist",
+  "version": "1.5.6",
+  "minimum_chrome_version": "116",
+  "description": "Independent Jain ERP helper for class filters and attendance copying. Not an official Jain extension.",
+  "permissions": [
+    "storage",
+    "scripting",
+    "activeTab",
+    "sidePanel",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://jained.jgianveshana.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Jain ERP Assist"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  }
+}
